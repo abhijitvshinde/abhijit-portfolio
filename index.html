@@ -2,19 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Abhijit V. Shinde | Portfolio</title>
-
-  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
-
-  <div class="bg-grid"></div>
+  <div class="noise"></div>
+  <div class="glow glow-one"></div>
+  <div class="glow glow-two"></div>
 
   <nav class="navbar">
-
-    <div class="logo">Abhijit Shinde</div>
+    <a href="#" class="brand">AVS<span>.</span></a>
 
     <div class="nav-links" id="navLinks">
       <a href="#about">About</a>
@@ -25,258 +24,199 @@
     </div>
 
     <button class="menu-btn" onclick="toggleMenu()">☰</button>
-
   </nav>
 
   <header class="hero">
+    <div class="hero-left reveal">
+      <p class="tag">RF Engineering • AI Systems • Intelligent Sensing</p>
 
-    <div class="hero-content">
-
-      <p class="eyebrow">
-        Ph.D. Researcher • RF/Microwave • Machine Learning
-      </p>
-
-      <h1>Abhijit V. Shinde</h1>
-
-      <h2>
-        Building intelligent sensing systems at the intersection of
-        microwave engineering, AI, and UAV technologies.
-      </h2>
+      <h1>
+        Designing intelligent
+        <span>microwave sensing</span>
+        systems.
+      </h1>
 
       <p class="hero-text">
-        Electrical and Computer Engineering Ph.D. student at North Carolina
-        A&T State University focused on RF systems, microwave imaging,
-        machine learning, intelligent sensing, and UAV technologies.
+        I am Abhijit V. Shinde, a Ph.D. researcher in Electrical and Computer Engineering
+        at North Carolina A&T State University. My work combines RF/microwave design,
+        electromagnetic simulation, machine learning, and UAV-based sensing.
       </p>
 
-      <div class="hero-buttons">
-
-        <a href="#projects" class="btn primary">
-          View Projects
-        </a>
-
-        <a href="resume.pdf" class="btn secondary" download>
-          Download Resume
-        </a>
-
-        <a href="#contact" class="btn secondary">
-          Contact Me
-        </a>
-
+      <div class="hero-actions">
+        <a href="#projects" class="btn primary">View Work</a>
+        <a href="resume.pdf" class="btn ghost" download>Download CV</a>
       </div>
 
-      <div class="social-links">
-
-        <a href="https://github.com/abhijitvshinde" target="_blank">
-          GitHub
-        </a>
-
-        <a href="https://linkedin.com/" target="_blank">
-          LinkedIn
-        </a>
-
-        <a href="mailto:abhijitvshinde@gmail.com">
-          Email
-        </a>
-
+      <div class="social-strip">
+        <a href="https://github.com/abhijitvshinde" target="_blank">GitHub</a>
+        <a href="https://www.linkedin.com/in/abhijit-shinde/" target="_blank">LinkedIn</a>
+        <a href="mailto:abhijitvshinde@gmail.com">Email</a>
       </div>
-
     </div>
 
-    <div class="hero-right">
-
-      <div class="hero-image-card">
-        <img src="profile.jpg" alt="Abhijit Shinde"/>
+    <div class="hero-right reveal">
+      <div class="profile-shell">
+        <img src="profile.jpg" alt="Abhijit V. Shinde" />
       </div>
 
-      <div class="hero-card">
-
-        <div class="orb"></div>
-
-        <h3>Research Focus</h3>
-
-        <p>RF + AI + Intelligent Sensing</p>
-
-        <span>
-          HFSS • XFdtd • MATLAB • Python • Deep Learning
-        </span>
-
+      <div class="terminal-card">
+        <div class="terminal-top">
+          <span></span><span></span><span></span>
+        </div>
+        <pre>
+research.focus = [
+  "YIG tunable filters",
+  "Microwave imaging",
+  "Antenna arrays",
+  "ML-driven sensing",
+  "UAV remote sensing"
+]</pre>
       </div>
-
     </div>
-
   </header>
 
   <main>
-
     <section id="about" class="section reveal">
+      <div class="section-label">About Me</div>
 
-      <h2>About</h2>
-
-      <p>
-        I am a Ph.D. student in Electrical and Computer Engineering
-        at North Carolina A&T State University. My work combines
-        electromagnetic simulation, RF/microwave design,
-        machine learning, and intelligent sensing systems.
-      </p>
-
+      <div class="split">
+        <h2>Engineering research with system-level thinking.</h2>
+        <p>
+          My research focuses on building practical intelligent sensing systems by connecting
+          simulation, hardware-aware design, data acquisition, and machine learning. I work across
+          RF/microwave engineering, electromagnetic simulation, antenna systems, biomedical sensing,
+          and UAV-enabled sensing platforms.
+        </p>
+      </div>
     </section>
 
     <section id="research" class="section reveal">
+      <div class="section-label">Research Domains</div>
 
-      <h2>Research Areas</h2>
-
-      <div class="grid">
-
+      <div class="cards">
         <div class="card">
-          <h3>YIG Tunable Filters</h3>
-          <p>
-            Planar tunable microwave filters using magnetic tuning
-            and spin-wave concepts.
-          </p>
+          <span>01</span>
+          <h3>YIG Tunable Microwave Filters</h3>
+          <p>Planar microwave filter design using magnetic tuning, YIG materials, and spin-wave concepts.</p>
         </div>
 
         <div class="card">
-          <h3>Microwave Imaging</h3>
-          <p>
-            Brain hemorrhage detection using antenna arrays,
-            S-parameters, and ML models.
-          </p>
+          <span>02</span>
+          <h3>Microwave Brain Imaging</h3>
+          <p>Machine learning-assisted hemorrhage detection using S-parameters and antenna arrays.</p>
         </div>
 
         <div class="card">
-          <h3>UAV Sensing</h3>
-          <p>
-            Remote sensing workflows using UAV-borne hyperspectral
-            imaging and autonomy.
-          </p>
+          <span>03</span>
+          <h3>UAV Sensing Systems</h3>
+          <p>Remote sensing workflows using UAV-borne hyperspectral imaging and autonomy.</p>
         </div>
 
         <div class="card">
-          <h3>ML Systems</h3>
-          <p>
-            End-to-end system design from data acquisition
-            to model deployment.
-          </p>
+          <span>04</span>
+          <h3>ML System Design</h3>
+          <p>End-to-end pipelines from data acquisition and feature engineering to model deployment.</p>
         </div>
-
       </div>
-
     </section>
 
     <section id="projects" class="section reveal">
+      <div class="section-label">Selected Projects</div>
 
-      <h2>Featured Projects</h2>
-
-      <div class="project-list">
-
-        <article class="project">
-          <span>01</span>
+      <div class="project-grid">
+        <article class="project-card large">
+          <p class="project-number">01</p>
           <h3>Planar YIG Tunable Microwave Bandpass Filter</h3>
           <p>
-            Design and simulation of a tunable RF filter
-            for microwave applications.
+            Design and simulation of a tunable RF filter for microwave applications,
+            using YIG material behavior and electromagnetic simulation workflows.
           </p>
+          <div class="chips">
+            <span>HFSS</span><span>YIG</span><span>RF Filter</span>
+          </div>
         </article>
 
-        <article class="project">
-          <span>02</span>
+        <article class="project-card">
+          <p class="project-number">02</p>
           <h3>Microwave Brain Hemorrhage Detection</h3>
           <p>
-            ML-assisted S-parameter analysis using Vivaldi
-            antenna arrays and head phantoms.
+            Antenna-array-based microwave sensing with ML regression/classification using S-parameter datasets.
           </p>
+          <div class="chips">
+            <span>Vivaldi</span><span>ML</span><span>S-Parameters</span>
+          </div>
         </article>
 
-        <article class="project">
-          <span>03</span>
+        <article class="project-card">
+          <p class="project-number">03</p>
           <h3>UAV-Borne Hyperspectral Imaging</h3>
           <p>
-            Remote sensing of wetland ecosystems using
-            UAV-based hyperspectral sensing.
+            UAV sensing framework for wetland ecosystem monitoring and intelligent remote sensing.
           </p>
+          <div class="chips">
+            <span>UAV</span><span>Remote Sensing</span><span>NASA</span>
+          </div>
         </article>
-
       </div>
-
     </section>
 
     <section id="publications" class="section reveal">
-
-      <h2>Publications & Highlights</h2>
+      <div class="section-label">Highlights</div>
 
       <div class="timeline">
-
-        <div>
-          <strong>IEEE AP-S/URSI 2026</strong>
-          <p>
-            Accepted paper on planar YIG tunable microwave
-            bandpass filter.
-          </p>
+        <div class="timeline-item">
+          <span>2026</span>
+          <h3>IEEE AP-S/URSI Accepted Paper</h3>
+          <p>Accepted work on planar YIG tunable microwave bandpass filter design.</p>
         </div>
 
-        <div>
-          <strong>NIST UAS Challenge</strong>
-          <p>
-            Finalist experience in UAV autonomy and sensing systems.
-          </p>
+        <div class="timeline-item">
+          <span>NIST</span>
+          <h3>UAS Challenge Finalist</h3>
+          <p>Experience in UAV autonomy, sensing, and challenge-driven engineering development.</p>
         </div>
 
-        <div>
-          <strong>NASA MUREP ACEIR 2.0</strong>
-          <p>
-            Reviewer service and research engagement.
-          </p>
+        <div class="timeline-item">
+          <span>NASA</span>
+          <h3>MUREP ACEIR 2.0 Reviewer</h3>
+          <p>Technical service and research engagement aligned with aerospace and sensing systems.</p>
         </div>
-
       </div>
-
     </section>
 
     <section class="section reveal">
-
-      <h2>Technical Skills</h2>
+      <div class="section-label">Technical Stack</div>
 
       <div class="skills">
         <span>HFSS</span>
         <span>XFdtd</span>
         <span>MATLAB</span>
         <span>Python</span>
-        <span>Machine Learning</span>
         <span>Deep Learning</span>
         <span>RF Design</span>
         <span>Antenna Design</span>
+        <span>S-Parameters</span>
         <span>GitHub</span>
         <span>Technical Writing</span>
       </div>
-
     </section>
 
     <section id="contact" class="section contact reveal">
-
-      <h2>Contact</h2>
-
-      <p>
-        Open to research collaborations, internships,
-        RF/ML opportunities, and technical discussions.
-      </p>
-
-      <a href="mailto:abhijitvshinde@gmail.com" class="btn primary">
-        Email Me
-      </a>
-
+      <div class="contact-box">
+        <p class="section-label">Contact</p>
+        <h2>Interested in RF, AI, sensing, or research collaboration?</h2>
+        <p>
+          Open to collaborations, internships, research discussions, and engineering opportunities.
+        </p>
+        <a href="mailto:abhijitvshinde@gmail.com" class="btn primary">Email Me</a>
+      </div>
     </section>
-
   </main>
 
   <footer>
-    <p>
-      © 2026 Abhijit V. Shinde.
-      Built with precision, curiosity, and engineering focus.
-    </p>
+    <p>© 2026 Abhijit V. Shinde. Built for research, engineering, and intelligent systems.</p>
   </footer>
 
   <script src="script.js"></script>
-
 </body>
 </html>
