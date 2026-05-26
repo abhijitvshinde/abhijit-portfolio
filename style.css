@@ -7,7 +7,12 @@
 
 body{
   font-family:Arial,sans-serif;
-  background:#050816;
+  background:
+    linear-gradient(rgba(5,8,22,0.88), rgba(5,8,22,0.92)),
+    url("background.png");
+  background-size:cover;
+  background-position:center;
+  background-attachment:fixed;
   color:white;
   overflow-x:hidden;
 }
