@@ -615,3 +615,24 @@ footer{
     color:#60a5fa;
     font-size:13px;
 }
+.page-title{
+  font-size:clamp(46px, 7vw, 92px);
+  line-height:0.95;
+  letter-spacing:-4px;
+  margin-bottom:24px;
+  background:linear-gradient(90deg, #f8fafc, #38bdf8, #a78bfa);
+  -webkit-background-clip:text;
+  color:transparent;
+}
+
+.page-intro{
+  max-width:780px;
+  color:var(--muted);
+  font-size:18px;
+  line-height:1.8;
+  margin-bottom:54px;
+}
+
+.projects-page{
+  padding-top:150px;
+}
