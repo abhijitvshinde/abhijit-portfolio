@@ -565,3 +565,80 @@ footer{
   }
   
 }
+
+/* =========================
+   PROJECTS PAGE
+========================= */
+
+.projects-page{
+  padding-top:150px;
+}
+
+.page-title{
+  font-size:clamp(48px, 7vw, 92px);
+  line-height:0.95;
+  letter-spacing:-4px;
+  margin-bottom:24px;
+  background:linear-gradient(
+      90deg,
+      #f8fafc,
+      #38bdf8,
+      #a78bfa
+  );
+  -webkit-background-clip:text;
+  color:transparent;
+}
+
+.page-intro{
+  max-width:760px;
+  color:var(--muted);
+  font-size:18px;
+  line-height:1.8;
+  margin-bottom:60px;
+}
+
+/* Better project cards */
+
+.project-card{
+  min-height:310px;
+  padding:32px;
+  border-radius:30px;
+  border:1px solid var(--line);
+  background:
+      radial-gradient(
+          circle at top right,
+          rgba(56,189,248,0.14),
+          transparent 38%
+      ),
+      rgba(12,18,32,0.86);
+
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  transition:0.35s;
+}
+
+.project-card:hover{
+  transform:translateY(-8px);
+  border-color:rgba(139,92,246,0.5);
+  box-shadow:0 20px 60px rgba(0,0,0,0.35);
+}
+
+.project-card h3{
+  font-size:30px;
+  line-height:1.15;
+  margin:15px 0;
+}
+
+.project-card p{
+  color:var(--muted);
+  line-height:1.8;
+}
+
+.project-number{
+  font-size:14px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  color:var(--blue);
+  font-weight:700;
+}
