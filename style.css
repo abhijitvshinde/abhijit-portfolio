@@ -563,4 +563,55 @@ footer{
   .contact-box{
     padding:34px 20px;
   }
+  
+}
+.projects-section{
+    max-width:1200px;
+    margin:auto;
+    padding:120px 40px;
+}
+
+.projects-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+    gap:30px;
+}
+
+.project-card{
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:24px;
+    padding:30px;
+    transition:0.3s;
+    backdrop-filter:blur(10px);
+}
+
+.project-card:hover{
+    transform:translateY(-8px);
+    border-color:#4fa7ff;
+}
+
+.project-card h3{
+    color:white;
+    margin-bottom:15px;
+}
+
+.project-card p{
+    color:#9ca3af;
+    line-height:1.7;
+}
+
+.tech-stack{
+    margin-top:20px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+}
+
+.tech-stack span{
+    padding:8px 14px;
+    border-radius:12px;
+    background:#111827;
+    color:#60a5fa;
+    font-size:13px;
 }
