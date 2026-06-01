@@ -1,36 +1,71 @@
-<section class="projects-section">
-  <h1>Featured Projects</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Projects | Abhijit V. Shinde</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
 
-  <div class="projects-grid">
+<body>
+  <div class="noise"></div>
+  <div class="glow glow-one"></div>
+  <div class="glow glow-two"></div>
 
-    <div class="project-card">
-      <h3>Microwave Brain Hemorrhage Detection</h3>
-      <p>
-        Portable microwave imaging system for intracranial hemorrhage
-        localization using HFSS simulations and machine learning.
-      </p>
+  <nav class="navbar">
+    <a href="index.html" class="brand">AVS<span>.</span></a>
 
-      <div class="tech-stack">
-        <span>HFSS</span>
-        <span>Python</span>
-        <span>CNN</span>
-        <span>Microwave Imaging</span>
-      </div>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">Home</a>
+      <a href="research.html">Research</a>
+      <a href="projects.html">Projects</a>
+      <a href="publications.html">Publications</a>
+      <a href="resume.html">Resume</a>
+      <a href="contact.html">Contact</a>
     </div>
 
-    <div class="project-card">
-      <h3>YIG Tunable Filter</h3>
-      <p>
-        Magnetically tunable RF filter using YIG resonators for
-        microwave communication systems.
-      </p>
+    <button class="menu-btn" onclick="toggleMenu()">☰</button>
+  </nav>
 
-      <div class="tech-stack">
-        <span>YIG</span>
-        <span>RF Design</span>
-        <span>HFSS</span>
-      </div>
+  <main class="section">
+    <p class="section-label">Selected Work</p>
+    <h1 class="page-title">Featured Projects</h1>
+
+    <div class="project-grid">
+
+      <article class="project-card">
+        <p class="project-number">01</p>
+        <h3>Microwave Brain Hemorrhage Detection</h3>
+        <p>
+          Portable microwave imaging system for intracranial hemorrhage localization
+          using HFSS simulations, antenna arrays, S-parameters, and machine learning.
+        </p>
+        <div class="chips">
+          <span>HFSS</span>
+          <span>Python</span>
+          <span>CNN</span>
+          <span>Microwave Imaging</span>
+        </div>
+      </article>
+
+      <article class="project-card">
+        <p class="project-number">02</p>
+        <h3>YIG Tunable Filter</h3>
+        <p>
+          Magnetically tunable RF filter using YIG resonators for microwave
+          communication and intelligent RF systems.
+        </p>
+        <div class="chips">
+          <span>YIG</span>
+          <span>RF Design</span>
+          <span>HFSS</span>
+          <span>Magnonics</span>
+        </div>
+      </article>
+
     </div>
+  </main>
 
-  </div>
-</section>
+  <script src="script.js"></script>
+</body>
+</html>
