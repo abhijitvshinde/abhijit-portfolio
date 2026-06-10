@@ -1,16 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>Publications | Abhijit V. Shinde</title>
+  <meta name="description" content="Publications, patents, submitted papers, and researcher profiles of Abhijit V. Shinde in RF engineering, microwave systems, AI, and intelligent sensing." />
 
-  <link rel="stylesheet" href="style.css">
-
-  <link rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
 <body>
@@ -22,62 +20,111 @@
   <nav class="navbar">
     <a href="index.html" class="brand">Abhijit Shinde<span>.</span></a>
 
-    <div class="nav-links">
+    <div class="nav-links" id="navLinks">
       <a href="index.html">Home</a>
       <a href="projects.html">Projects</a>
       <a href="publications.html">Publications</a>
     </div>
+
+    <button class="menu-btn" onclick="toggleMenu()">☰</button>
   </nav>
 
   <main class="section projects-page">
 
     <p class="section-label">Research Output</p>
 
-    <h1 class="page-title">
-      Publications
-    </h1>
+    <h1 class="page-title">Publications</h1>
 
     <p class="page-intro">
-      Conference papers, journal publications, patents, and technical contributions
-      in RF engineering, microwave systems, intelligent sensing, machine learning,
-      and UAV technologies.
+      Publications, patents, submitted work, and research profiles related to RF engineering,
+      microwave systems, intelligent sensing, machine learning, UAV systems, and biomedical imaging.
     </p>
 
-    <div class="timeline">
+    <div class="profile-links">
 
-      <div class="timeline-item">
+      <a href="YOUR_GOOGLE_SCHOLAR_LINK" target="_blank">
+        <i class="fas fa-graduation-cap"></i>
+        Google Scholar
+      </a>
+
+      <a href="YOUR_RESEARCHGATE_LINK" target="_blank">
+        <i class="fab fa-researchgate"></i>
+        ResearchGate
+      </a>
+
+      <a href="YOUR_ORCID_LINK" target="_blank">
+        <i class="fab fa-orcid"></i>
+        ORCID
+      </a>
+
+    </div>
+
+    <section class="publication-section">
+      <h2>Conference Papers</h2>
+
+      <div class="publication-card">
         <span>2026</span>
         <h3>Planar YIG Tunable Microwave Bandpass Filter</h3>
         <p>
-          IEEE AP-S / URSI Symposium.
+          IEEE AP-S / URSI Symposium. Work focused on YIG-based tunable microwave bandpass filter design.
         </p>
+        <div class="chips">
+          <span>YIG</span>
+          <span>RF Filter</span>
+          <span>Microwave Engineering</span>
+        </div>
       </div>
 
-      <div class="timeline-item">
-        <span>2025</span>
+    </section>
+
+    <section class="publication-section">
+      <h2>Journal Papers</h2>
+
+      <div class="publication-card">
+        <span>Manuscript</span>
         <h3>Portable Wideband Microwave Imaging System for Intracranial Hemorrhage Detection</h3>
         <p>
-          Microwave imaging, machine learning, and biomedical sensing research.
+          Research on microwave imaging, antenna arrays, S-parameter processing, and machine learning
+          for brain hemorrhage localization.
         </p>
+        <div class="chips">
+          <span>Microwave Imaging</span>
+          <span>Machine Learning</span>
+          <span>Biomedical Sensing</span>
+        </div>
       </div>
 
-      <div class="timeline-item">
+    </section>
+
+    <section class="publication-section">
+      <h2>Patents</h2>
+
+      <div class="publication-card">
         <span>Patent</span>
-        <h3>Patent #1</h3>
-        <p>
-          Add patent title and details here.
-        </p>
+        <h3>Patent Title 1</h3>
+        <p>Add patent title, patent number, country, and short description here.</p>
       </div>
 
-      <div class="timeline-item">
+      <div class="publication-card">
         <span>Patent</span>
-        <h3>Patent #2</h3>
+        <h3>Patent Title 2</h3>
+        <p>Add patent title, patent number, country, and short description here.</p>
+      </div>
+
+    </section>
+
+    <section class="publication-section">
+      <h2>Submitted / Under Review</h2>
+
+      <div class="publication-card submitted">
+        <span>Under Review</span>
+        <h3>Future Submitted Publication Title</h3>
         <p>
-          Add patent title and details here.
+          Add submitted or under-review papers here. These will remain manually updated until they appear online.
         </p>
       </div>
 
-    </div>
+    </section>
 
   </main>
 
@@ -85,34 +132,33 @@
 
     <div class="footer-social">
 
-      <a href="https://www.linkedin.com/in/abhijitvshinde/" target="_blank">
+      <a href="https://www.linkedin.com/in/abhijitvshinde/" target="_blank" title="LinkedIn">
         <i class="fab fa-linkedin-in"></i>
       </a>
 
-      <a href="https://github.com/abhijitvshinde" target="_blank">
+      <a href="https://github.com/abhijitvshinde" target="_blank" title="GitHub">
         <i class="fab fa-github"></i>
       </a>
 
-      <a href="mailto:abhijitvshinde@gmail.com">
+      <a href="mailto:abhijitvshinde@gmail.com" title="Email">
         <i class="fas fa-envelope"></i>
       </a>
 
-      <a href="https://www.instagram.com/real_abhijitshinde/" target="_blank">
+      <a href="https://www.instagram.com/real_abhijitshinde/" target="_blank" title="Instagram">
         <i class="fab fa-instagram"></i>
       </a>
 
-      <a href="https://www.facebook.com/abhijitvshinde" target="_blank">
+      <a href="https://www.facebook.com/abhijitvshinde" target="_blank" title="Facebook">
         <i class="fab fa-facebook-f"></i>
       </a>
 
     </div>
 
-    <p>
-      © 2026 Abhijit V. Shinde • RF Engineering • AI • Intelligent Sensing
-    </p>
+    <p>© 2026 Abhijit V. Shinde • RF Engineering • AI • Intelligent Sensing</p>
 
   </footer>
 
-</body>
+  <script src="script.js"></script>
 
+</body>
 </html>
