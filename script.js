@@ -16,6 +16,36 @@ function revealSections() {
   });
 }
 
-window.addEventListener("scroll", revealSections);
+function updateSideNavActive() {
+  const sections = document.querySelectorAll("header[id], section[id]");
+  const navLinks = document.querySelectorAll(".side-nav a");
 
-revealSections();
+  let currentSection = "";
+
+  sections.forEach((section) => {
+    const sectionTop = section.offsetTop - 180;
+    const sectionHeight = section.offsetHeight;
+
+    if (window.scrollY >= sectionTop && window.scrollY < sectionTop + sectionHeight) {
+      currentSection = section.getAttribute("id");
+    }
+  });
+
+  navLinks.forEach((link) => {
+    link.classList.remove("active");
+
+    if (link.getAttribute("href") === "#" + currentSection) {
+      link.classList.add("active");
+    }
+  });
+}
+
+window.addEventListener("scroll", () => {
+  revealSections();
+  updateSideNavActive();
+});
+
+window.addEventListener("load", () => {
+  revealSections();
+  updateSideNavActive();
+});
