@@ -946,58 +946,106 @@ footer{
 }
 
 /* =========================
-   LEFT HOMEPAGE SECTION NAV
+   PREMIUM SIDEBAR NAVIGATION
 ========================= */
 
 .side-nav{
   position:fixed;
-  left:30px;
+  left:24px;
   top:50%;
   transform:translateY(-50%);
+  width:240px;
+
+  background:rgba(6,18,35,0.75);
+  backdrop-filter:blur(18px);
+
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:24px;
+
+  padding:18px;
+
   display:flex;
   flex-direction:column;
-  gap:18px;
+  gap:10px;
+
   z-index:1000;
+
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.35),
+    inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 .side-nav a{
-  color:#94a3b8;
+  display:flex;
+  align-items:center;
+  gap:14px;
+
+  padding:14px 16px;
+
   text-decoration:none;
-  font-size:16px;
-  font-weight:600;
-  letter-spacing:0.5px;
-  padding:10px 18px;
-  border-radius:12px;
+
+  color:#cbd5e1;
+
+  border-radius:16px;
+
   transition:all 0.3s ease;
-  position:relative;
+
+  font-size:15px;
+  font-weight:600;
 }
 
-.side-nav a::before{
-  content:"";
-  position:absolute;
-  left:-12px;
-  top:50%;
-  transform:translateY(-50%);
-  width:4px;
-  height:0;
-  border-radius:10px;
-  background:#38bdf8;
+.side-nav a i{
+  width:24px;
+  text-align:center;
+
+  font-size:18px;
+
+  color:#94a3b8;
+
   transition:0.3s;
 }
 
+.side-nav a span{
+  letter-spacing:0.5px;
+}
+
 .side-nav a:hover{
+  background:linear-gradient(
+    135deg,
+    rgba(56,189,248,0.18),
+    rgba(139,92,246,0.12)
+  );
+
+  transform:translateX(5px);
+
   color:white;
-  background:rgba(56,189,248,0.12);
-  transform:translateX(6px);
 }
 
-.side-nav a:hover::before{
-  height:70%;
-  box-shadow:0 0 20px #38bdf8;
+.side-nav a:hover i{
+  color:#38bdf8;
 }
 
-@media(max-width:1100px){
+.side-nav a.active{
+  background:linear-gradient(
+    135deg,
+    rgba(56,189,248,0.25),
+    rgba(139,92,246,0.18)
+  box-shadow:
+    0 0 20px rgba(56,189,248,0.15),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+  );
+
+  color:white;
+}
+
+.side-nav a.active i{
+  color:#38bdf8;
+}
+
+@media(max-width:1350px){
+
   .side-nav{
     display:none;
   }
+
 }
