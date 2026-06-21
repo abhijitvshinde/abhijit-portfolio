@@ -944,3 +944,40 @@ footer{
   color:#38bdf8;
   font-size:14px;
 }
+
+/* =========================
+   LEFT HOMEPAGE SECTION NAV
+========================= */
+
+.side-nav{
+  position:fixed;
+  left:24px;
+  top:50%;
+  transform:translateY(-50%);
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  z-index:900;
+}
+
+.side-nav a{
+  color:#94a3b8;
+  text-decoration:none;
+  font-size:13px;
+  letter-spacing:1px;
+  padding:8px 12px;
+  border-left:2px solid rgba(255,255,255,0.12);
+  transition:0.25s;
+}
+
+.side-nav a:hover{
+  color:#38bdf8;
+  border-left-color:#38bdf8;
+  transform:translateX(4px);
+}
+
+@media(max-width:1100px){
+  .side-nav{
+    display:none;
+  }
+}
