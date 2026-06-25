@@ -1137,3 +1137,10 @@ footer{
 .publication-home-btn{
   margin-top:34px;
 }
+.nav-links a.active{
+  color:#38bdf8;
+}
+
+.nav-links a.active::after{
+  width:100%;
+}
