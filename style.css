@@ -1034,3 +1034,54 @@ footer{
     display:none;
   }
 }
+
+/* =========================
+   HOMEPAGE PROJECT PREVIEW
+========================= */
+
+.homepage-project-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+  gap:22px;
+  margin-top:40px;
+}
+
+.homepage-project-card{
+  padding:26px;
+  border-radius:24px;
+  background:
+    radial-gradient(circle at top right, rgba(56,189,248,0.12), transparent 35%),
+    rgba(12,18,32,0.86);
+  border:1px solid rgba(255,255,255,0.08);
+  transition:0.3s ease;
+}
+
+.homepage-project-card:hover{
+  transform:translateY(-6px);
+  border-color:rgba(56,189,248,0.45);
+  box-shadow:0 20px 55px rgba(0,0,0,0.3);
+}
+
+.homepage-project-card span{
+  color:#38bdf8;
+  font-size:13px;
+  font-weight:800;
+  letter-spacing:1px;
+  text-transform:uppercase;
+}
+
+.homepage-project-card h3{
+  margin:14px 0;
+  font-size:22px;
+  line-height:1.25;
+}
+
+.homepage-project-card p{
+  color:#94a3b8;
+  line-height:1.7;
+  font-size:15px;
+}
+
+.homepage-project-btn{
+  margin-top:34px;
+}
