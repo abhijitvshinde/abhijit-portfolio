@@ -345,8 +345,9 @@ pre{
 .split p,
 .contact-box p{
   color:var(--muted);
-  line-height:1.85;
-  font-size:17px;
+  line-height:1.75;
+  font-size:22px;
+  font-weight:400;
 }
 
 .cards{
