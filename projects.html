@@ -1,15 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="stylesheet"
-  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>Projects | Abhijit V. Shinde</title>
-  <meta name="description" content="Selected RF engineering, microwave imaging, YIG tunable filter, UAV sensing, and machine learning projects by Abhijit V. Shinde." />
+  <meta name="description" content="Projects by Abhijit V. Shinde across communications, RF and microwave engineering, AI, signal processing, UAV systems, optimization, biomedical IoT, and industrial automation." />
 
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
 <body>
@@ -17,176 +16,373 @@
   <div class="glow glow-one"></div>
   <div class="glow glow-two"></div>
 
+  <aside class="project-side-nav">
+    <a href="#communications">Communications</a>
+    <a href="#rf-microwave">RF & Microwave</a>
+    <a href="#ai-signal">AI & Signal Processing</a>
+    <a href="#uav-systems">UAV Systems</a>
+    <a href="#optimization">Optimization</a>
+    <a href="#biomedical-iot">Biomedical & IoT</a>
+    <a href="#automation">Automation</a>
+  </aside>
+
   <nav class="navbar">
-  <a href="index.html" class="brand">Abhijit Shinde<span>.</span></a>
+    <a href="index.html" class="brand">Abhijit Shinde<span>.</span></a>
 
-  <div class="nav-links" id="navLinks">
-    <a href="index.html">HOME</a>
-    <a href="projects.html" class="active">PROJECTS</a>
-    <a href="publications.html">PUBLICATIONS</a>
-    <a href="academic.html">ACADEMIC</a>
-    <a href="resume.html">RESUME</a>
-    <a href="index.html#contact">CONTACT</a>
-  </div>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">HOME</a>
+      <a href="projects.html" class="active">PROJECTS</a>
+      <a href="publications.html">PUBLICATIONS</a>
+      <a href="academic.html">ACADEMIC</a>
+      <a href="resume.html">RESUME</a>
+      <a href="index.html#contact">CONTACT</a>
+    </div>
 
-  <button class="menu-btn" onclick="toggleMenu()">☰</button>
-</nav>
-  <link rel="stylesheet"
-href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  
-  <main class="section projects-page reveal">
-    <p class="section-label">Selected Work</p>
+    <button class="menu-btn" onclick="toggleMenu()">☰</button>
+  </nav>
 
-    <h1 class="page-title">
-      Featured Projects
-    </h1>
+  <main class="section projects-page">
+
+    <p class="section-label">Research & Engineering Portfolio</p>
+
+    <h1 class="page-title">Projects</h1>
 
     <p class="page-intro">
-      A focused collection of my work across RF engineering, microwave systems,
-      intelligent sensing, machine learning, biomedical imaging, and UAV-based platforms.
+      A detailed collection of projects across communications engineering, RF and microwave systems,
+      artificial intelligence, signal processing, UAV systems, optimization, biomedical IoT,
+      and industrial automation.
     </p>
 
-    <div class="project-grid">
+    <section id="communications" class="project-category">
+      <h2>Communications Engineering</h2>
 
-      <article class="project-card large">
-        <p class="project-number">01</p>
-
-        <h3>Microwave Brain Hemorrhage Detection</h3>
-
+      <article class="detailed-project-card">
+        <div class="project-meta">Communications • Cognitive Radio • GitHub Project</div>
+        <h3>Dynamic Spectrum Management for Cognitive Radio Networks</h3>
         <p>
-          Portable microwave imaging system for intracranial hemorrhage localization
-          using antenna arrays, HFSS simulations, S-parameter analysis, and machine
-          learning-based prediction.
+          Developed an intelligent spectrum allocation and channel selection framework for adaptive
+          wireless communication systems. The project focuses on efficient spectrum utilization,
+          spectrum sensing, decision-making, and dynamic wireless resource management.
         </p>
+        <div class="project-detail-grid">
+          <div>
+            <h4>Key Contributions</h4>
+            <ul>
+              <li>Designed spectrum sensing and adaptive channel selection workflow.</li>
+              <li>Implemented communication system logic suitable for cognitive radio simulations.</li>
+              <li>Prepared the project for public GitHub documentation and demonstration.</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Tools & Skills</h4>
+            <div class="chips">
+              <span>Communications</span>
+              <span>Cognitive Radio</span>
+              <span>Spectrum Management</span>
+              <span>Python</span>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
 
+    <section id="rf-microwave" class="project-category">
+      <h2>RF & Microwave Engineering</h2>
+
+      <article class="detailed-project-card featured-project">
+        <div class="project-meta">RF & Microwave • YIG • Ph.D. Research</div>
+        <h3>Planar YIG Tunable Microwave Bandpass Filter</h3>
+        <p>
+          Designed and analyzed a magnetically tunable microwave bandpass filter using YIG resonators
+          for next-generation RF and communication systems. The work combines electromagnetic
+          simulation, RF filter design, magnetic tuning, and measurement-oriented development.
+        </p>
+        <div class="project-detail-grid">
+          <div>
+            <h4>Key Contributions</h4>
+            <ul>
+              <li>Developed YIG-based tunable microwave filter design concepts.</li>
+              <li>Used electromagnetic simulation workflows for RF performance evaluation.</li>
+              <li>Investigated tuning behavior for frequency-agile microwave systems.</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Tools & Skills</h4>
+            <div class="chips">
+              <span>YIG</span>
+              <span>HFSS</span>
+              <span>RF Filter</span>
+              <span>Microwave Engineering</span>
+              <span>Magnonics</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="detailed-project-card">
+        <div class="project-meta">RF Imaging • Biomedical Sensing • AI</div>
+        <h3>CNN-Based Microwave Imaging for Intracranial Hemorrhage Detection</h3>
+        <p>
+          Developed a deep-learning-driven microwave imaging system for non-invasive brain hemorrhage
+          detection using Vivaldi antenna arrays, S-parameter datasets, HFSS/XFdtd simulations,
+          and CNN-based classification pipelines.
+        </p>
+        <div class="project-detail-grid">
+          <div>
+            <h4>Key Contributions</h4>
+            <ul>
+              <li>Designed and optimized Vivaldi antenna arrays for microwave imaging.</li>
+              <li>Generated and processed S-parameter datasets for hemorrhage localization.</li>
+              <li>Built CNN pipelines for imaging and classification.</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Tools & Skills</h4>
+            <div class="chips">
+              <span>HFSS</span>
+              <span>XFdtd</span>
+              <span>CNN</span>
+              <span>Python</span>
+              <span>Microwave Imaging</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="detailed-project-card">
+        <div class="project-meta">Coursework • RF Design</div>
+        <h3>RF & Antenna Design Projects</h3>
+        <p>
+          Completed RF and microwave coursework projects involving broadband matching networks,
+          microwave low-pass filters, antenna design, impedance matching, and electromagnetic
+          simulation workflows.
+        </p>
         <div class="chips">
+          <span>ADS</span>
           <span>HFSS</span>
+          <span>Antenna Design</span>
+          <span>Matching Networks</span>
+          <span>Microwave Filters</span>
+        </div>
+      </article>
+    </section>
+
+    <section id="ai-signal" class="project-category">
+      <h2>Artificial Intelligence & Signal Processing</h2>
+
+      <article class="detailed-project-card">
+        <div class="project-meta">Machine Learning • Big Data Analytics</div>
+        <h3>Wildfire Analytics & Prediction</h3>
+        <p>
+          Applied machine learning to analyze 1.88 million U.S. wildfire records from 1992–2015,
+          identifying spatiotemporal risk patterns and predictive factors for wildfire management
+          and resource planning.
+        </p>
+        <div class="chips">
           <span>Python</span>
-          <span>CNN</span>
-          <span>S-Parameters</span>
-          <span>Microwave Imaging</span>
+          <span>Pandas</span>
+          <span>NumPy</span>
+          <span>Scikit-learn</span>
+          <span>SQL</span>
+          <span>Data Visualization</span>
         </div>
       </article>
 
-      <article class="project-card">
-        <p class="project-number">02</p>
-
-        <h3>YIG Tunable Microwave Filter</h3>
-
+      <article class="detailed-project-card">
+        <div class="project-meta">Medical Imaging • Deep Learning</div>
+        <h3>COVID-19 Detection from Medical Imaging</h3>
         <p>
-          Magnetically tunable RF filter design using YIG resonators for microwave
-          communication systems, frequency-agile circuits, and magnonics-inspired devices.
+          Developed CNN-based models for COVID-19 detection from chest X-ray and HRCT scans,
+          using enhanced deep learning architectures for medical image classification.
         </p>
-
         <div class="chips">
-          <span>YIG</span>
-          <span>RF Design</span>
-          <span>HFSS</span>
-          <span>Magnonics</span>
+          <span>MATLAB</span>
+          <span>Python</span>
+          <span>TensorFlow</span>
+          <span>Deep Learning</span>
+          <span>Medical Imaging</span>
         </div>
       </article>
 
-      <article class="project-card">
-        <p class="project-number">03</p>
-
-        <h3>NIST UAS Challenge</h3>
-
+      <article class="detailed-project-card">
+        <div class="project-meta">Image Processing • Published Research</div>
+        <h3>Blood Spatter Source Reconstruction Using Image Processing</h3>
         <p>
-          Autonomous UAV system for GPS-denied indoor mapping and first-responder
-          applications with sensing, navigation, and mission-focused design.
+          Developed image-processing methods to estimate blood spatter source reconstruction from
+          crime scene photographs, reducing human error and improving forensic interpretation.
         </p>
+        <div class="chips">
+          <span>MATLAB</span>
+          <span>Image Processing</span>
+          <span>Machine Learning</span>
+          <span>Forensic Analysis</span>
+        </div>
+      </article>
 
+      <article class="detailed-project-card">
+        <div class="project-meta">AI • Biomedical Signal Processing</div>
+        <h3>Blood Type Detection Using Machine Learning</h3>
+        <p>
+          Applied machine learning to detect clot formation and improve blood type detection
+          accuracy from image-based observations of coagulation patterns.
+        </p>
+        <div class="chips">
+          <span>Machine Learning</span>
+          <span>MATLAB</span>
+          <span>Python</span>
+          <span>Biomedical Signal Processing</span>
+        </div>
+      </article>
+    </section>
+
+    <section id="uav-systems" class="project-category">
+      <h2>UAV & Autonomous Systems</h2>
+
+      <article class="detailed-project-card">
+        <div class="project-meta">UAV • First Responder Systems</div>
+        <h3>NIST First Responder UAV Mapping System</h3>
+        <p>
+          Developed UAV systems for GPS-denied indoor mapping and first-responder applications,
+          integrating navigation, sensing, mission design, and mapping workflows.
+        </p>
         <div class="chips">
           <span>UAV</span>
-          <span>Autonomy</span>
           <span>Pixhawk</span>
-          <span>Mapping</span>
+          <span>QGroundControl</span>
+          <span>3D Mapping</span>
+          <span>Autonomy</span>
         </div>
       </article>
 
-      <article class="project-card">
-        <p class="project-number">04</p>
-
-        <h3>NASA / GoAero UAV Platform</h3>
-
+      <article class="detailed-project-card">
+        <div class="project-meta">NASA / GoAero • UAV Platform</div>
+        <h3>Aggie First Response / NASA-GoAero UAV Platform</h3>
         <p>
-          Long-range autonomous UAV platform concept for emergency response,
+          Contributed to a long-range autonomous UAV platform concept for emergency response,
           aerial mapping, and advanced sensing missions.
         </p>
-
         <div class="chips">
           <span>NASA</span>
           <span>GoAero</span>
-          <span>Mission Planning</span>
           <span>UAV Systems</span>
+          <span>Mission Planning</span>
         </div>
       </article>
+    </section>
 
-      <article class="project-card">
-        <p class="project-number">05</p>
+    <section id="optimization" class="project-category">
+      <h2>Optimization & Intelligent Systems</h2>
 
-        <h3>RF & Antenna Design</h3>
-
+      <article class="detailed-project-card">
+        <div class="project-meta">NASA ULI • Optimization • Autonomous Systems</div>
+        <h3>NASA Urban Air Mobility Conflict Avoidance</h3>
         <p>
-          Wideband Vivaldi antennas, microwave filters, matching networks,
-          and electromagnetic simulation projects using RF design workflows.
+          Developed optimization-based scheduling and conflict-avoidance models for autonomous
+          urban air mobility operations, focusing on safe separation and pre-departure scheduling.
         </p>
-
         <div class="chips">
-          <span>HFSS</span>
-          <span>XFdtd</span>
-          <span>ADS</span>
-          <span>Antenna Design</span>
+          <span>Optimization</span>
+          <span>Scheduling</span>
+          <span>MATLAB</span>
+          <span>Autonomous Systems</span>
+          <span>UAM</span>
+        </div>
+      </article>
+    </section>
+
+    <section id="biomedical-iot" class="project-category">
+      <h2>Biomedical & IoT Systems</h2>
+
+      <article class="detailed-project-card">
+        <div class="project-meta">Biomedical IoT • Embedded Systems</div>
+        <h3>Smart IV Monitoring System</h3>
+        <p>
+          Designed an IoT-enabled infusion monitoring system to automate IV fluid monitoring and
+          flow control using sensors, Arduino microcontrollers, real-time monitoring, and embedded control.
+        </p>
+        <div class="chips">
+          <span>IoT</span>
+          <span>Arduino</span>
+          <span>Sensors</span>
+          <span>Embedded Systems</span>
+          <span>Biomedical Automation</span>
         </div>
       </article>
 
-    </div>
+      <article class="detailed-project-card">
+        <div class="project-meta">Biosensors • Smart Healthcare</div>
+        <h3>Biosensor-Based Bacteria Detection System</h3>
+        <p>
+          Developed a smart biosensor concept for isolation and identification of bacteria from fruits
+          and vegetables using embedded sensing and biomedical system design.
+        </p>
+        <div class="chips">
+          <span>Biosensors</span>
+          <span>Embedded Systems</span>
+          <span>Biomedical Sensing</span>
+          <span>Smart Systems</span>
+        </div>
+      </article>
+    </section>
+
+    <section id="automation" class="project-category">
+      <h2>Industrial Automation & Control</h2>
+
+      <article class="detailed-project-card">
+        <div class="project-meta">Machine Vision • Industrial Automation</div>
+        <h3>Automatic Wire Color Code Inspection</h3>
+        <p>
+          Developed automated inspection methods for wire color-code checking using machine vision
+          and machine learning concepts for industrial quality assurance.
+        </p>
+        <div class="chips">
+          <span>Machine Vision</span>
+          <span>Automation</span>
+          <span>Machine Learning</span>
+          <span>Quality Inspection</span>
+        </div>
+      </article>
+
+      <article class="detailed-project-card">
+        <div class="project-meta">Industrial Automation • Manufacturing</div>
+        <h3>Pharmaceutical Packaging Automation</h3>
+        <p>
+          Developed automation programs for blister packing machines, tablet coating machines,
+          automated coater machines, and carton packing systems.
+        </p>
+        <div class="chips">
+          <span>Automation</span>
+          <span>B&R Automation</span>
+          <span>PLC</span>
+          <span>Manufacturing</span>
+        </div>
+      </article>
+    </section>
+
   </main>
 
-  <footer>
-    <p>© 2026 Abhijit V. Shinde. RF Engineering • AI • Intelligent Sensing.</p>
+  <footer class="site-footer">
+    <div class="footer-social">
+      <a href="https://www.linkedin.com/in/abhijitvshinde/" target="_blank" title="LinkedIn">
+        <i class="fab fa-linkedin-in"></i>
+      </a>
+      <a href="https://github.com/abhijitvshinde" target="_blank" title="GitHub">
+        <i class="fab fa-github"></i>
+      </a>
+      <a href="mailto:abhijitvshinde@gmail.com" title="Email">
+        <i class="fas fa-envelope"></i>
+      </a>
+      <a href="https://www.instagram.com/real_abhijitshinde/" target="_blank" title="Instagram">
+        <i class="fab fa-instagram"></i>
+      </a>
+      <a href="https://www.facebook.com/abhijitvshinde" target="_blank" title="Facebook">
+        <i class="fab fa-facebook-f"></i>
+      </a>
+    </div>
+
+    <p>© 2026 Abhijit V. Shinde • Communications • RF Engineering • AI • Intelligent Sensing</p>
   </footer>
 
   <script src="script.js"></script>
-<footer class="site-footer">
-
-  <div class="footer-social">
-
-    <a href="https://www.linkedin.com/in/abhijitvshinde/"
-       target="_blank"
-       title="LinkedIn">
-      <i class="fab fa-linkedin-in"></i>
-    </a>
-
-    <a href="https://github.com/abhijitvshinde"
-       target="_blank"
-       title="GitHub">
-      <i class="fab fa-github"></i>
-    </a>
-
-    <a href="mailto:abhijitvshinde@gmail.com"
-       title="Email">
-      <i class="fas fa-envelope"></i>
-    </a>
-
-    <a href="https://www.instagram.com/real_abhijitshinde/"
-       target="_blank"
-       title="Instagram">
-      <i class="fab fa-instagram"></i>
-    </a>
-
-    <a href="https://www.facebook.com/abhijitvshinde"
-       target="_blank"
-       title="Facebook">
-      <i class="fab fa-facebook-f"></i>
-    </a>
-
-  </div>
-
-  <p>
-    © 2026 Abhijit V. Shinde • RF Engineering • AI • Intelligent Sensing
-  </p>
-
-</footer>
 </body>
 </html>
