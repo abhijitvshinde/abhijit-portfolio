@@ -12,29 +12,79 @@ content="Academic and professional experience of Abhijit V. Shinde in communicat
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
-<body>
+<body class="academic-body">
 
   <div class="noise"></div>
   <div class="glow glow-one"></div>
   <div class="glow glow-two"></div>
 
-  <nav class="navbar">
-    <a href="index.html" class="brand">Abhijit Shinde</a>
+          <nav class="navbar">
+            <a href="index.html" class="brand">Abhijit Shinde</a>
+        
+            <div class="nav-links" id="navLinks">
+              <a href="index.html">HOME</a>
+              <a href="projects.html">PROJECTS</a>
+              <a href="publications.html">PUBLICATIONS</a>
+              <a
+                href="academic.html"
+                class="active"
+                aria-current="page"
+                >
+                ACADEMIC &amp; EXPERIENCE
+              </a>
+              <a href="honors.html"> HONORS </a>
+              <a href="resume.html">RESUME</a>
+              <a href="index.html#contact">CONTACT</a>
+            </div>
+        
+            <button class="menu-btn" onclick="toggleMenu()">☰</button>
+          </nav>
+          <nav
+          class="page-side-nav"
+          aria-label="Academic and professional experience page sections"
+        >
+        
+          <p class="page-side-nav-title">
+            Academic &amp; Experience
+          </p>
+        
+          <a
+            href="#education"
+            class="active"
+            aria-current="location"
+          >
+            <i class="fas fa-graduation-cap" aria-hidden="true"></i>
+            <span>Education</span>
+          </a>
+        
+          <a href="#professional-experience">
+            <i class="fas fa-briefcase" aria-hidden="true"></i>
+            <span>Professional Experience</span>
+          </a>
+        
+          <a href="#relevant-coursework">
+            <i class="fas fa-book" aria-hidden="true"></i>
+            <span>Relevant Coursework</span>
+          </a>
+        
+          <a href="#academic-coursework-projects">
+            <i class="fas fa-laptop-code" aria-hidden="true"></i>
+            <span>Academic &amp; Coursework Projects</span>
+          </a>
+        
+          <a href="#research-experience">
+            <i class="fas fa-microscope" aria-hidden="true"></i>
+            <span>Research Experience</span>
+          </a>
+        
+          <a href="#teaching-mentoring-outreach">
+            <i class="fas fa-chalkboard-teacher" aria-hidden="true"></i>
+            <span>Teaching, Mentoring &amp; Outreach</span>
+          </a>
+        
+        </nav>
 
-    <div class="nav-links" id="navLinks">
-      <a href="index.html">HOME</a>
-      <a href="projects.html">PROJECTS</a>
-      <a href="publications.html">PUBLICATIONS</a>
-      <a href="academic.html" class="active">ACADEMIC & EXPERIENCE</a>
-      <a href="honors.html"> HONORS </a>
-      <a href="resume.html">RESUME</a>
-      <a href="index.html#contact">CONTACT</a>
-    </div>
-
-    <button class="menu-btn" onclick="toggleMenu()">☰</button>
-  </nav>
-
-  <main class="section projects-page">
+  <main class="section academic-page content-with-side-nav">
 
     <p class="section-label">Academic</p>
 
@@ -67,9 +117,12 @@ content="Academic and professional experience of Abhijit V. Shinde in communicat
     
     </div>
 
-      <section class="academic-section">
-  
-        <h2>Education</h2>
+      <section
+        class="academic-section"
+        id="education"
+      >
+
+      <h2>Education</h2>
       
         <div class="academic-card">
           <span>2023 – Present</span>
@@ -103,10 +156,12 @@ content="Academic and professional experience of Abhijit V. Shinde in communicat
           </p>
     </div>
   
-  </section>
-    <section class="academic-section">
+   <section
+    class="academic-section"
+    id="professional-experience"
+    >
 
-  <h2>Professional Experience</h2>
+    <h2>Professional Experience</h2>
 
   <div class="academic-card">
     <span>2022 – 2023</span>
@@ -157,8 +212,11 @@ content="Academic and professional experience of Abhijit V. Shinde in communicat
 
 </section>
 
-    <section class="academic-section">
-      <h2>Relevant Coursework</h2>
+    <section
+      class="academic-section"
+      id="relevant-coursework"
+    >
+    <h2>Relevant Coursework</h2>
 
       <div class="course-grid">
         <div class="course-card">Microwave Circuits</div>
@@ -172,8 +230,11 @@ content="Academic and professional experience of Abhijit V. Shinde in communicat
       </div>
     </section>
 
-    <section class="academic-section">
-      <h2>Academic & Coursework Projects</h2>
+    <section
+      class="academic-section"
+      id="academic-coursework-projects"
+    >
+    <h2>Academic &amp; Coursework Projects</h2>
 
       <div class="academic-card">
         <span>RF & Microwave</span>
@@ -210,8 +271,11 @@ content="Academic and professional experience of Abhijit V. Shinde in communicat
       </div>
     </section>
 
-    <section class="academic-section">
-      <h2>Research Experience</h2>
+    <section
+      class="academic-section"
+      id="research-experience"
+    >
+    <h2>Research Experience</h2>
 
       <div class="academic-card">
         <span>Graduate Research</span>
@@ -240,8 +304,11 @@ content="Academic and professional experience of Abhijit V. Shinde in communicat
       </div>
     </section>
 
-    <section class="academic-section">
-      <h2>Teaching, Mentoring & Outreach</h2>
+    <section
+      class="academic-section"
+      id="teaching-mentoring-outreach"
+    >
+    <h2>Teaching, Mentoring &amp; Outreach</h2>
 
       <div class="academic-card">
         <span>Teaching</span>
