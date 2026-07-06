@@ -1964,3 +1964,184 @@ footer{
 .brand span{
   color:#38bdf8;
 }
+/* ==========================================
+   INTERNAL PAGE SIDE NAVIGATION
+========================================== */
+
+.page-side-nav{
+  position:fixed;
+  left:24px;
+  top:50%;
+  transform:translateY(-50%);
+
+  width:250px;
+  max-height:calc(100vh - 130px);
+  overflow-y:auto;
+
+  display:flex;
+  flex-direction:column;
+  gap:9px;
+
+  padding:20px;
+
+  background:rgba(6,18,35,0.82);
+  backdrop-filter:blur(18px);
+
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:24px;
+
+  box-shadow:0 12px 42px rgba(0,0,0,0.30);
+
+  z-index:1000;
+}
+
+.page-side-nav-title{
+  margin:0 8px 9px;
+
+  color:#38bdf8;
+
+  font-size:12px;
+  font-weight:800;
+  line-height:1.4;
+  letter-spacing:1.6px;
+  text-transform:uppercase;
+}
+
+.page-side-nav a{
+  display:grid;
+  grid-template-columns:25px minmax(0, 1fr);
+  align-items:center;
+  gap:11px;
+
+  min-height:48px;
+  padding:11px 13px;
+
+  color:#94a3b8;
+  text-decoration:none;
+
+  font-size:14px;
+  font-weight:700;
+  line-height:1.35;
+
+  border:1px solid transparent;
+  border-radius:14px;
+
+  transition:
+    color 0.25s ease,
+    background 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.25s ease;
+}
+
+.page-side-nav a i{
+  width:25px;
+
+  color:#94a3b8;
+
+  font-size:16px;
+  text-align:center;
+
+  transition:color 0.25s ease;
+}
+
+.page-side-nav a span{
+  min-width:0;
+}
+
+.page-side-nav a:hover{
+  color:#ffffff;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(56,189,248,0.22),
+      rgba(139,92,246,0.13)
+    );
+
+  transform:translateX(4px);
+}
+
+.page-side-nav a:hover i{
+  color:#38bdf8;
+}
+
+.page-side-nav a.active{
+  color:#ffffff;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(56,189,248,0.30),
+      rgba(139,92,246,0.17)
+    );
+
+  border-color:rgba(56,189,248,0.30);
+}
+
+.page-side-nav a.active i{
+  color:#38bdf8;
+}
+
+
+/* ==========================================
+   PUBLICATIONS PAGE LAYOUT
+========================================== */
+
+.publications-page{
+  padding-top:150px;
+}
+
+.content-with-side-nav{
+  width:min(1060px, calc(100% - 320px));
+  max-width:1060px;
+
+  margin-left:310px;
+  margin-right:auto;
+}
+
+.publication-section{
+  scroll-margin-top:115px;
+}
+
+
+/* ==========================================
+   SMALLER DESKTOP / LAPTOP
+========================================== */
+
+@media(max-width:1450px){
+
+  .page-side-nav{
+    left:16px;
+    width:220px;
+    padding:16px;
+  }
+
+  .page-side-nav a{
+    padding:10px 11px;
+    font-size:13px;
+  }
+
+  .content-with-side-nav{
+    width:min(980px, calc(100% - 275px));
+    margin-left:255px;
+    margin-right:20px;
+  }
+}
+
+
+/* ==========================================
+   MACBOOK / TABLET
+========================================== */
+
+@media(max-width:1180px){
+
+  .page-side-nav{
+    display:none;
+  }
+
+  .content-with-side-nav{
+    width:min(1100px, calc(100% - 32px));
+    margin-left:auto;
+    margin-right:auto;
+  }
+}
