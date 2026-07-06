@@ -1769,3 +1769,50 @@ footer{
         padding:28px;
     }
 }
+/* Header alignment fix */
+
+.navbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    width:100%;
+}
+
+.navbar .logo{
+    display:block;
+    flex-shrink:0;
+    color:#ffffff;
+    font-weight:700;
+    letter-spacing:0.06em;
+    text-decoration:none;
+    white-space:nowrap;
+}
+
+.navbar .nav-links{
+    display:flex;
+    align-items:center;
+    margin-left:auto;
+}
+
+@media(min-width:901px){
+
+    .navbar .menu-toggle{
+        display:none;
+    }
+}
+
+@media(max-width:900px){
+
+    .navbar .menu-toggle{
+        display:block;
+        margin-left:auto;
+    }
+
+    .navbar .nav-links{
+        display:none;
+    }
+
+    .navbar .nav-links.show{
+        display:flex;
+    }
+}
