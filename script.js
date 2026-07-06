@@ -49,3 +49,124 @@ window.addEventListener("load", () => {
   revealSections();
   updateSideNavActive();
 });
+/* ==========================================
+   INTERNAL PAGE SIDE NAVIGATION
+========================================== */
+
+function initializePageSideNavigation() {
+
+  const sideNav =
+    document.querySelector(".page-side-nav");
+
+  if (!sideNav) {
+    return;
+  }
+
+  const links = Array.from(
+    sideNav.querySelectorAll('a[href^="#"]')
+  );
+
+  const sections = links
+    .map((link) => {
+
+      const selector =
+        link.getAttribute("href");
+
+      return document.querySelector(selector);
+
+    })
+    .filter(Boolean);
+
+  if (!sections.length) {
+    return;
+  }
+
+  function updatePageSideNavigation() {
+
+    const navbarOffset = 160;
+
+    let currentSection = sections[0];
+
+    sections.forEach((section) => {
+
+      const sectionTop =
+        section.getBoundingClientRect().top;
+
+      if (sectionTop <= navbarOffset) {
+        currentSection = section;
+      }
+
+    });
+
+    links.forEach((link) => {
+
+      const targetId =
+        link.getAttribute("href").replace("#", "");
+
+      const isActive =
+        currentSection.id === targetId;
+
+      link.classList.toggle(
+        "active",
+        isActive
+      );
+
+      if (isActive) {
+
+        link.setAttribute(
+          "aria-current",
+          "location"
+        );
+
+      } else {
+
+        link.removeAttribute(
+          "aria-current"
+        );
+
+      }
+
+    });
+
+  }
+
+  links.forEach((link) => {
+
+    link.addEventListener("click", () => {
+
+      links.forEach((item) => {
+
+        item.classList.remove("active");
+        item.removeAttribute("aria-current");
+
+      });
+
+      link.classList.add("active");
+
+      link.setAttribute(
+        "aria-current",
+        "location"
+      );
+
+    });
+
+  });
+
+  window.addEventListener(
+    "scroll",
+    updatePageSideNavigation,
+    { passive:true }
+  );
+
+  window.addEventListener(
+    "resize",
+    updatePageSideNavigation
+  );
+
+  updatePageSideNavigation();
+}
+
+document.addEventListener(
+  "DOMContentLoaded",
+  initializePageSideNavigation
+);
