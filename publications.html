@@ -14,11 +14,9 @@ content="Publications by Abhijit V. Shinde in communications, RF engineering, mi
 
   <link rel="stylesheet" href="style.css" />
 
-  <link rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-</head>
+  
 
-<body>
+<body class="publications-body">
 
   <div class="noise"></div>
   <div class="glow glow-one"></div>
@@ -39,8 +37,29 @@ content="Publications by Abhijit V. Shinde in communications, RF engineering, mi
 
   <button class="menu-btn" onclick="toggleMenu()">☰</button>
 </nav>
+  <nav class="page-side-nav" aria-label="Publications page sections">
 
-  <main class="section projects-page">
+  <p class="page-side-nav-title">
+    Publications
+  </p>
+
+  <a
+    href="#published-papers"
+    class="active"
+    aria-current="location"
+  >
+    <i class="fas fa-book-open" aria-hidden="true"></i>
+    <span>Published Papers</span>
+  </a>
+
+  <a href="#current-research">
+    <i class="fas fa-flask" aria-hidden="true"></i>
+    <span>Current Research &amp; Submitted Work</span>
+  </a>
+
+</nav>
+
+  <main class="section publications-page content-with-side-nav">
 
     <p class="section-label">Research Output</p>
 
@@ -101,7 +120,10 @@ content="Publications by Abhijit V. Shinde in communications, RF engineering, mi
 
     </section>
 
-    <section class="publication-section">
+    <section
+    class="publication-section"
+    id="published-papers"
+    >
 
       <h2>Published Papers</h2>
 
@@ -311,7 +333,10 @@ content="Publications by Abhijit V. Shinde in communications, RF engineering, mi
 
     </section>
 
-    <section class="publication-section">
+    <section
+      class="publication-section"
+      id="current-research"
+    >
 
       <h2>Current Research & Submitted Work</h2>
 
