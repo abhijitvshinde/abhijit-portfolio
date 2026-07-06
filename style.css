@@ -1555,21 +1555,6 @@ footer{
     margin-right:auto;
   }
 }
-@media(max-width:900px){
-
-    .navbar .menu-toggle{
-        display:block;
-        margin-left:auto;
-    }
-
-    .navbar .nav-links{
-        display:none;
-    }
-
-    .navbar .nav-links.show{
-        display:flex;
-    }
-}
 
 ```css
 /* ==========================================
@@ -1968,3 +1953,14 @@ footer{
     }
 }
 
+.brand{
+  color:white;
+  text-decoration:none;
+  font-size:22px;
+  font-weight:800;
+  letter-spacing:1px;
+}
+
+.brand span{
+  color:#38bdf8;
+}
