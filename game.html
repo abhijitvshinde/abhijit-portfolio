@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>What I Do Next? | Oil Leak Robot Game | Abhijit V. Shinde</title>
+  <meta name="description"
+    content="What I Do Next? — a free interactive game for grades 5-8 where kids instruct an underwater robot through prevention, detection, and mitigation of an oil leak.">
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+
+<body>
+  <div class="noise"></div>
+  <div class="glow glow-one"></div>
+  <div class="glow glow-two"></div>
+
+  <nav class="navbar">
+    <a href="index.html" class="brand">Abhijit Shinde</a>
+
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">HOME</a>
+      <a href="projects.html">PROJECTS</a>
+      <a href="publications.html">PUBLICATIONS</a>
+      <a href="academic.html">ACADEMIC &amp; EXPERIENCE</a>
+      <a href="honors.html"> HONORS </a>
+      <a href="resume.html">RESUME</a>
+      <a href="game.html" class="active">KIDS GAME</a>
+      <a href="index.html#contact">CONTACT</a>
+    </div>
+
+    <button class="menu-btn" onclick="toggleMenu()">☰</button>
+  </nav>
+
+  <main class="section game-page">
+
+    <p class="section-label">For Grades 5–8</p>
+    <h1 class="page-title">What I Do Next?</h1>
+
+    <p class="page-intro">
+      Meet <strong>ROV-7</strong>, an underwater robot connected to a ship by a zipline data cable.
+      ROV-7's job is to <strong>prevent</strong>, <strong>detect</strong>, and <strong>mitigate</strong>
+      an oil leak — but it can only do what you tell it. Type an instruction for what ROV-7 should do next.
+      If your answer is too general, ROV-7 will ask "How?" until you give it a real plan. Stuck? Keep trying —
+      ROV-7 starts dropping hints after a few attempts.
+    </p>
+
+    <div class="game-shell">
+
+      <aside class="game-info-panel">
+        <div class="robot-avatar-shell">
+          <svg viewBox="0 0 120 120" width="86" height="86" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="robotHead" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#1d2b4a"/>
+                <stop offset="1" stop-color="#3b2f63"/>
+              </linearGradient>
+            </defs>
+            <line x1="60" y1="30" x2="60" y2="12" stroke="#a78bfa" stroke-width="4" stroke-linecap="round"/>
+            <circle cx="60" cy="8" r="7" fill="#38bdf8"/>
+            <rect x="18" y="30" width="84" height="66" rx="18" fill="url(#robotHead)" stroke="#38bdf8" stroke-width="3"/>
+            <circle cx="42" cy="60" r="9" fill="#0c1220"/>
+            <circle cx="42" cy="60" r="4" fill="#38bdf8"/>
+            <circle cx="78" cy="60" r="9" fill="#0c1220"/>
+            <circle cx="78" cy="60" r="4" fill="#38bdf8"/>
+            <rect x="42" y="78" width="36" height="8" rx="4" fill="#0c1220"/>
+          </svg>
+        </div>
+
+        <h3>ROV-7</h3>
+        <p class="robot-caption">
+          <i class="fa-solid fa-link"></i> Connected to the ship by a zipline data cable
+        </p>
+
+        <div class="mission-goals">
+          <div class="goal-item goal-prevention">
+            <i class="fa-solid fa-shield-halved"></i>
+            <span>Prevention</span>
+          </div>
+          <div class="goal-item goal-detection">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span>Detection</span>
+          </div>
+          <div class="goal-item goal-mitigation">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Mitigation</span>
+          </div>
+        </div>
+
+        <div class="progress-block">
+          <div class="progress-row">
+            <span id="progressText">Stage 1 of 8</span>
+            <span id="phaseBadge" class="phase-badge phase-detection">
+              <i class="fa-solid fa-magnifying-glass"></i> Detection
+            </span>
+          </div>
+          <div class="progress-track">
+            <div id="progressFill" class="progress-fill"></div>
+          </div>
+          <p id="attemptNote" class="attempt-note"></p>
+        </div>
+
+        <button id="restartBtn" class="btn ghost restart-btn" type="button">
+          <i class="fa-solid fa-rotate-left"></i> Restart Mission
+        </button>
+      </aside>
+
+      <section id="gamePanel" class="game-panel">
+        <div id="chatLog" class="chat-window" aria-live="polite"></div>
+
+        <form id="gameForm" class="chat-input-row">
+          <input
+            id="gameInput"
+            type="text"
+            autocomplete="off"
+            placeholder="Tell ROV-7 what to do next..."
+            aria-label="Your instruction for ROV-7"
+          />
+          <button type="submit" class="btn primary">
+            <i class="fa-solid fa-paper-plane"></i> Send
+          </button>
+        </form>
+      </section>
+
+      <section id="victoryPanel" class="victory-panel hidden">
+        <div class="badge-trophy">
+          <i class="fa-solid fa-trophy"></i>
+        </div>
+        <h2>Mission Complete!</h2>
+        <p class="victory-subtitle">
+          You guided ROV-7 through a full <strong>Prevent → Detect → Mitigate</strong> cycle. Here's your mission log:
+        </p>
+
+        <div class="recap-grid">
+          <div class="recap-group recap-detection">
+            <h4><i class="fa-solid fa-magnifying-glass"></i> Detection</h4>
+            <ul id="recapDetection"></ul>
+          </div>
+          <div class="recap-group recap-prevention">
+            <h4><i class="fa-solid fa-shield-halved"></i> Prevention</h4>
+            <ul id="recapPrevention"></ul>
+          </div>
+          <div class="recap-group recap-mitigation">
+            <h4><i class="fa-solid fa-triangle-exclamation"></i> Mitigation</h4>
+            <ul id="recapMitigation"></ul>
+          </div>
+          <div class="recap-group recap-wrapup">
+            <h4><i class="fa-solid fa-flag-checkered"></i> Wrap-Up</h4>
+            <ul id="recapWrapup"></ul>
+          </div>
+        </div>
+
+        <button id="playAgainBtn" class="btn primary" type="button">
+          <i class="fa-solid fa-rotate-right"></i> Play Again
+        </button>
+      </section>
+
+    </div>
+
+    <section class="game-notes">
+      <h2>For Parents & Teachers</h2>
+      <p>
+        This game was designed for students in grades 5–8 to build intuition about how real inspection
+        robots handle infrastructure problems: checking similar spots proactively (prevention), using
+        the right sensor for the right question (detection), and responding in the correct order —
+        stop the source, contain the spill, then report it (mitigation). Answers are evaluated loosely
+        on keywords, so encourage kids to type full, specific instructions rather than single words.
+      </p>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-social">
+      <a href="https://www.linkedin.com/in/abhijitvshinde/"   aria-label="LinkedIn">
+        <i class="fab fa-linkedin-in"></i>
+      </a>
+      <a href="https://github.com/abhijitvshinde"  aria-label="GitHub">
+        <i class="fab fa-github"></i>
+      </a>
+      <a href="mailto:abhijitvshinde@gmail.com"  aria-label="Email">
+        <i class="fas fa-envelope"></i>
+      </a>
+      <a href="https://www.instagram.com/real_abhijitshinde/"  aria-label="Instagram">
+        <i class="fab fa-instagram"></i>
+      </a>
+      <a href="https://www.facebook.com/abhijitvshinde"  aria-label="Facebook">
+        <i class="fab fa-facebook-f"></i>
+      </a>
+    </div>
+
+    <p>© 2026 Abhijit V. Shinde • Communications • RF Engineering • AI • Intelligent Sensing</p>
+  </footer>
+
+  <script src="script.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
