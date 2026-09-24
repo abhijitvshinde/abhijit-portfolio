@@ -17,8 +17,8 @@ content="Engineering projects by Abhijit V. Shinde in communications, RF systems
   <div class="glow glow-two"></div>
 
   <aside class="project-side-nav">
-    <a href="#communications">Communications</a>
     <a href="#rf-microwave">RF & Microwave</a>
+    <a href="#communications">Communications</a>
     <a href="#ai-signal">AI & Signal Processing</a>
     <a href="#uav-systems">UAV Systems</a>
     <a href="#optimization">Optimization</a>
@@ -50,46 +50,63 @@ content="Engineering projects by Abhijit V. Shinde in communications, RF systems
     <h1 class="page-title">Projects</h1>
 
     <p class="page-intro">
-      A detailed collection of projects across communications engineering, RF and microwave systems,
-      artificial intelligence, signal processing, UAV systems, optimization, biomedical IoT,
-      and industrial automation.
+      Projects in RF and microwave engineering come first, followed by work in communications,
+      artificial intelligence, UAV systems, optimization, biomedical IoT, and industrial automation.
     </p>
 
-    <section id="communications" class="project-category">
-      <h2>Communications Engineering</h2>
+    <section id="rf-microwave" class="project-category">
+      <h2>RF & Microwave Engineering</h2>
 
-      <article class="detailed-project-card">
-        <div class="project-meta">Communications • Cognitive Radio • GitHub Project</div>
-        <h3>Dynamic Spectrum Management for Cognitive Radio Networks</h3>
+      <article class="detailed-project-card featured-project recent">
+        <div class="project-meta">New • RF Instrumentation • Python Desktop Application</div>
+        <h3>Automated Electromagnet &amp; VNA Measurement System</h3>
         <p>
-          Developed an intelligent spectrum allocation and channel selection framework for adaptive
-          wireless communication systems. The project focuses on efficient spectrum utilization,
-          spectrum sensing, decision-making, and dynamic wireless resource management.
+          Built a Windows desktop application that controls an electromagnet power supply and a
+          Keysight PNA-X vector network analyzer over GPIB. It runs automated magnetic-field sweeps,
+          measures S-parameters at every field point, and saves all data as it is acquired. Built for
+          measuring field-tunable devices such as YIG filters.
         </p>
         <div class="project-detail-grid">
           <div>
             <h4>Key Contributions</h4>
             <ul>
-              <li>Designed spectrum sensing and adaptive channel selection workflow.</li>
-              <li>Implemented communication system logic suitable for cognitive radio simulations.</li>
-              <li>Prepared the project for public GitHub documentation and demonstration.</li>
+              <li>Central safety layer enforces a maximum-current limit on every current command, with a software voltage monitor that triggers an emergency stop.</li>
+              <li>Gradual current ramping to avoid inductive kickback from the coil, and current-to-field calibration with hysteresis support.</li>
+              <li>Automated sweeps measuring S11, S21, S12, and S22, with live plots, color maps, and HDF5/CSV data saving.</li>
+              <li>Simulation mode with a shared instrument model, so the app runs without hardware; 43 automated unit tests.</li>
             </ul>
           </div>
           <div>
             <h4>Tools & Skills</h4>
             <div class="chips">
-              <span>Communications</span>
-              <span>Cognitive Radio</span>
-              <span>Spectrum Management</span>
               <span>Python</span>
+              <span>PySide6</span>
+              <span>PyVISA / SCPI</span>
+              <span>GPIB</span>
+              <span>Keysight PNA-X</span>
+              <span>Instrument Automation</span>
+              <span>HDF5</span>
+              <span>pytest</span>
             </div>
           </div>
         </div>
       </article>
-    </section>
 
-    <section id="rf-microwave" class="project-category">
-      <h2>RF & Microwave Engineering</h2>
+      <article class="detailed-project-card recent">
+        <div class="project-meta">New • RF Measurement • Data Acquisition</div>
+        <h3>Automated Microwave Scanning Platform</h3>
+        <p>
+          Built an automated scanning platform for repeatable microwave measurements, used to collect
+          S-parameter datasets and compare measured results against simulation.
+        </p>
+        <div class="chips">
+          <span>LiteVNA 64</span>
+          <span>Arduino</span>
+          <span>MATLAB</span>
+          <span>S-Parameters</span>
+          <span>Test Automation</span>
+        </div>
+      </article>
 
       <article class="detailed-project-card featured-project">
         <div class="project-meta">RF & Microwave • YIG • Ph.D. Research</div>
@@ -97,7 +114,8 @@ content="Engineering projects by Abhijit V. Shinde in communications, RF systems
         <p>
           Designed and analyzed a magnetically tunable microwave bandpass filter using YIG resonators
           for next-generation RF and communication systems. The work combines electromagnetic
-          simulation, RF filter design, magnetic tuning, and measurement-oriented development.
+          simulation, RF filter design, magnetic tuning, and measurement-oriented development,
+          and was presented at IEEE AP-S/URSI 2026.
         </p>
         <div class="project-detail-grid">
           <div>
@@ -165,6 +183,39 @@ content="Engineering projects by Abhijit V. Shinde in communications, RF systems
           <span>Antenna Design</span>
           <span>Matching Networks</span>
           <span>Microwave Filters</span>
+        </div>
+      </article>
+    </section>
+
+    <section id="communications" class="project-category">
+      <h2>Communications Engineering</h2>
+
+      <article class="detailed-project-card">
+        <div class="project-meta">Communications • Cognitive Radio • GitHub Project</div>
+        <h3>Dynamic Spectrum Management for Cognitive Radio Networks</h3>
+        <p>
+          Developed an intelligent spectrum allocation and channel selection framework for adaptive
+          wireless communication systems. The project focuses on efficient spectrum utilization,
+          spectrum sensing, decision-making, and dynamic wireless resource management.
+        </p>
+        <div class="project-detail-grid">
+          <div>
+            <h4>Key Contributions</h4>
+            <ul>
+              <li>Designed spectrum sensing and adaptive channel selection workflow.</li>
+              <li>Implemented communication system logic suitable for cognitive radio simulations.</li>
+              <li>Prepared the project for public GitHub documentation and demonstration.</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Tools & Skills</h4>
+            <div class="chips">
+              <span>Communications</span>
+              <span>Cognitive Radio</span>
+              <span>Spectrum Management</span>
+              <span>Python</span>
+            </div>
+          </div>
         </div>
       </article>
     </section>
