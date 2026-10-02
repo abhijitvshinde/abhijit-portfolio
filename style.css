@@ -10,7 +10,7 @@
   --panel:#0c1220;
   --panel2:#111827;
   --text:#f8fafc;
-  --muted:#94a3b8;
+  --muted:#a9b6ca;
   --blue:#38bdf8;
   --purple:#8b5cf6;
   --line:rgba(255,255,255,0.1);
@@ -164,9 +164,9 @@ body{
 }
 
 .hero h1{
-  font-size:clamp(48px, 8vw, 96px);
-  line-height:0.95;
-  letter-spacing:-4px;
+  font-size:clamp(38px, 6vw, 72px);
+  line-height:1.08;
+  letter-spacing:-1.5px;
   margin-bottom:28px;
 }
 
@@ -500,12 +500,13 @@ footer{
   text-align:center;
 }
 
-.reveal{
+.js .reveal{
   opacity:0;
   transform:translateY(32px);
   transition:0.9s ease;
 }
 
+.js .reveal.active,
 .reveal.active{
   opacity:1;
   transform:translateY(0);
@@ -572,7 +573,7 @@ footer{
   }
 
   .hero h1{
-    letter-spacing:-2px;
+    letter-spacing:-1px;
   }
 
   .cards{

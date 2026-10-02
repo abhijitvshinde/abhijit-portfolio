@@ -170,3 +170,12 @@ document.addEventListener(
   "DOMContentLoaded",
   initializePageSideNavigation
 );
+
+/* Safety net: if scroll events never fire (print, crawlers, some browsers), show everything. */
+window.addEventListener("load", function revealFallback() {
+  setTimeout(function () {
+    document.querySelectorAll(".reveal").forEach(function (el) {
+      el.classList.add("active");
+    });
+  }, 1500);
+});
