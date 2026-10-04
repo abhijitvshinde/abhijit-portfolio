@@ -47,4 +47,10 @@ Then open http://localhost:8000/game.html#fll. The local server stores data in `
 
 ## Updating mission content
 
-Mission goals and the simplified 3D test models are in `fll-missions.js` (each mission's `sim`: boxes in LEGO studs, plus the goal spot and check type: `lift`, `press`, `push`, `hook`, `deliver` or `avoid`). The 3D builder and the test logic are in `fll-builder.js`. If FIRST publishes a Challenge Update, edit the matching mission there. Mission summaries are written in our own words. The official Robot Game Rulebook and Challenge Updates are always the authority.
+Everything about the field lives in `fll-missions.js`:
+
+- `MODELS`: each mission model as LEGO-stud-sized parts (boxes, Technic beams, cylinders), shaped from the official photos in the Field Setup Guide. Parts with `g` belong to a moving group (for example the rock, the root cover or the cane), `target` parts glow, and `protect` parts must not be touched.
+- `FIELD.place`: where each model sits on the 295 x 143 stud mat, based on the official Field Setup Guide.
+- `MISSIONS`: the robot's start position and heading for each test, plus the checks (`push`, `hook`, `lift`, `pull`, `deliver`, `avoid`) with their goal zones and the animation the real model does when the mission is done.
+
+The 3D builder, the field drawing and the test logic are in `fll-builder.js`. The models are close look-alikes, not brick-for-brick copies; the official Robot Game Rulebook and Challenge Updates are always the authority.

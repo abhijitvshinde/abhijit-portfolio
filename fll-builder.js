@@ -182,10 +182,10 @@ function rotateAround(point, center, axis, deg) {
   return [v.x + center[0], v.y + center[1], v.z + center[2]];
 }
 
-/* Advice for moving the closest piece into the goal spot */
-function moveAdvice(boxes, zone) {
+/* Advice for moving the closest piece into the (closest) goal spot */
+function moveAdvice(boxes, zones) {
   let best = null;
-  for (const b of boxes) {
+  for (const zone of zones) for (const b of boxes) {
     const d = [0, 1, 2].map((ax) => {
       if (b[ax + 3] <= zone[ax] + EPS) return Math.ceil(zone[ax] - b[ax] - EPS);
       if (b[ax] >= zone[ax + 3] - EPS) return -Math.ceil(b[ax + 3] - zone[ax + 3] - EPS);
@@ -208,41 +208,108 @@ function moveAdvice(boxes, zone) {
   return "Move it " + parts.join(", ") + ".";
 }
 
+/* ---------- the field: placing models and converting coordinates ---------- */
+
+const FD = () => globalThis.FLL_DATA;
+const R4 = (v) => Math.round(v * 1000) / 1000;
+
+// Where every model sits for this mission (dock missions use the farm dock).
+function placements(mission) {
+  const { FIELD, DOCKS } = FD();
+  const list = FIELD.place.map((p) => Object.assign({}, p));
+  if (mission.dock) {
+    const farm = list.find((p) => p.dock === "farm");
+    const own = list.find((p) => p.model === mission.model);
+    if (own && farm && own !== farm) { const d = own.dock; own.dock = "farm"; farm.dock = d; }
+  }
+  return list.map((p) => (p.dock ? Object.assign(p, { x: DOCKS[p.dock][0], z: DOCKS[p.dock][1], rot: 0 }) : p));
+}
+
+function modelToWorld(v, pl) {
+  const r = ((pl.rot || 0) * Math.PI) / 180, c = Math.cos(r), sn = Math.sin(r);
+  return [R4(v[0] * c + v[2] * sn + pl.x), v[1], R4(-v[0] * sn + v[2] * c + pl.z)];
+}
+
+// World -> robot frame (robot front-center at 0, driving toward +x, +z = robot's right)
+function worldToLocal(v, st) {
+  const hd = (st.h * Math.PI) / 180, c = Math.cos(hd), sn = Math.sin(hd);
+  const dx = v[0] - st.x, dz = v[2] - st.z;
+  return [R4(dx * c - dz * sn), v[1], R4(dx * sn + dz * c)];
+}
+
+function boxThrough(b, f) {
+  const a = f([b[0], b[1], b[2]]), c = f([b[3], b[4], b[5]]);
+  return [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.min(a[2], c[2]), Math.max(a[0], c[0]), Math.max(a[1], c[1]), Math.max(a[2], c[2])];
+}
+
+function partBox(p) {
+  if (p.k === "cyl") return [p.c[0] - p.r, p.c[1], p.c[2] - p.r, p.c[0] + p.r, p.c[1] + p.h, p.c[2] + p.r];
+  if (p.k === "ball") return [p.c[0] - p.r, p.c[1] - p.r, p.c[2] - p.r, p.c[0] + p.r, p.c[1] + p.r, p.c[2] + p.r];
+  return p.b;
+}
+
+export function missionWorld(mission) {
+  const { MODELS, FIELD } = FD();
+  const st = mission.start;
+  const pls = placements(mission);
+  const avoid = (mission.checks || []).some((c) => c.type === "avoid");
+  const via = (pl) => (v) => worldToLocal(modelToWorld(v, pl), st);
+  const solids = [];
+  for (const pl of pls) {
+    const def = MODELS[pl.model];
+    if (!def) continue;
+    const own = pl.model === mission.model;
+    for (const part of def.parts) {
+      if (part.deco) continue;
+      solids.push({ name: part.name, box: boxThrough(partBox(part), via(pl)), protect: avoid && !!part.protect, own });
+    }
+  }
+  const [W, D] = FIELD.size;
+  const Hw = FIELD.wallHeight;
+  for (const b of [[-3, 0, -3, W + 3, Hw, 0], [-3, 0, D, W + 3, Hw, D + 3], [-3, 0, 0, 0, Hw, D], [W, 0, 0, W + 3, Hw, D]]) {
+    solids.push({ name: "table wall", box: boxThrough(b, (v) => worldToLocal(v, st)) });
+  }
+  const placement = pls.find((p) => p.model === mission.model);
+  return { solids, placement, placements: pls, zone: (z) => boxThrough(z, via(placement)) };
+}
+
+const zonesOf = (check) => (check.zones || (check.zone ? [check.zone] : []));
+
 /* Run a mission test (pure: no drawing). */
 export function evaluate(mission, build) {
-  const sim = mission.sim;
   const lane = build.lane || 0;
   const angle = build.motorAngle || 0;
   const pieces = (build.pieces || []).filter((p) => PIECES[p.t]);
-  const res = { ok: false, steps: [], startX: 0, t: 0, tx: 0, lane, angle, passed: [] };
-  if (!sim) {
+  const res = { ok: false, steps: [], startX: 0, t: 0, tx: 0, lane, angle, passed: [], hitGroups: {} };
+  if (!mission.start || !FD()) {
     res.steps.push({ ok: false, text: "This mission can't be tested here yet." });
     return res;
   }
-  if (!pieces.length && !sim.allowEmpty) {
+  if (!pieces.length && !mission.allowEmpty) {
     res.steps.push({ ok: false, text: "Add some LEGO pieces to your robot first!" });
     return res;
   }
 
+  const world = missionWorld(mission);
   const info = analyse(pieces);
   res.info = info;
-  const startX = Math.min(0, (sim.startFront ?? 10) - info.front);
-  const solids = sim.solids.filter((s) => !s.deco);
+  const startX = Math.min(0, 10 - info.front);
+  const solids = world.solids;
   const movers = ROBOT.map((r) => ({ box: r.b, robot: true }))
     .concat(info.cells.map(({ c, i }) => ({ box: cellBox(c), i })));
 
-  let t = sim.driveTo != null ? sim.driveTo - (startX + info.front) : 40;
+  let t = mission.driveTo != null ? mission.driveTo - (startX + info.front) : 40;
   let hit = null;
   for (const m of movers) {
     const a = shift(m.box, startX, lane);
-    for (const s of solids) {
-      const b = s.box;
+    for (const so of solids) {
+      const b = so.box;
       if (!overlap(a[1], a[4], b[1], b[4]) || !overlap(a[2], a[5], b[2], b[5])) continue;
       if (a[3] <= b[0] + EPS) {
         const lim = b[0] - a[3];
-        if (lim < t) { t = lim; hit = { s, m }; }
+        if (lim < t) { t = lim; hit = { s: so, m }; }
       } else if (a[0] < b[3] - EPS) {
-        t = 0; hit = { s, m };
+        t = 0; hit = { s: so, m };
       }
     }
   }
@@ -258,79 +325,82 @@ export function evaluate(mission, build) {
   const whoHit = hit ? (hit.m.robot ? "your robot" : "your " + PIECES[pieces[hit.m.i].t].name.toLowerCase()) : "";
   const stopNote = hit ? " The robot stopped when " + whoHit + " bumped the " + hit.s.name + "." : "";
   const shaftWorld = info.motor ? [info.motor.shaft[0] + 0.5 + tx, info.motor.shaft[1] + 0.5, info.motor.shaft[2] + 0.5 + lane] : null;
+  const armPoint = (c, deg) => rotateAround([c[0] + 0.5 + tx, c[1] + 0.5, c[2] + 0.5 + lane], shaftWorld, info.motor.axis, deg);
 
-  for (const check of sim.checks) {
-    const zone = check.zone;
+  for (const check of mission.checks) {
+    const zones = zonesOf(check).map(world.zone);
+    const hitZone = (boxes) => zones.findIndex((z) => boxes.some((b) => boxOverlap(b, z)));
     let ok = false;
     let text = "";
 
     if (check.type === "push" || check.type === "hook" || check.type === "deliver") {
       const pool = check.type === "push" ? attachBoxes.concat(robotBoxes) : attachBoxes;
-      const count = pool.filter((b) => boxOverlap(b, zone)).length;
       const need = check.type === "deliver" ? (check.min || 2) : 1;
-      ok = count >= need;
-      if (ok) text = check.done;
-      else if (count > 0) text = "Almost! Make the part that reaches the goal spot a bit bigger.";
-      else text = "Not touching the goal spot yet. " + moveAdvice(attachBoxes.length ? attachBoxes : robotBoxes, zone) + stopNote;
+      const counts = zones.map((z) => pool.filter((b) => boxOverlap(b, z)).length);
+      const best = counts.indexOf(Math.max(0, ...counts));
+      ok = counts[best] >= need;
+      if (ok) {
+        text = check.done;
+        if (check.groups) res.hitGroups[check.label] = check.groups[best];
+      } else if (counts[best] > 0) text = "Almost! Make the part that reaches the goal spot a bit bigger.";
+      else text = "Not reaching the goal spot yet. " + moveAdvice(attachBoxes.length ? attachBoxes : robotBoxes, zones) + stopNote;
     }
 
-    if (check.type === "lift" || check.type === "press") {
+    if (check.type === "lift" || check.type === "press" || check.type === "pull") {
       const lifting = check.type === "lift";
+      const pulling = check.type === "pull";
       if (!info.motor) {
-        const close = attachBoxes.some((b) => boxOverlap(b, zone));
+        const close = hitZone(attachBoxes) >= 0;
         text = close
           ? "Great spot! Now it has to move " + (lifting ? "UP" : "DOWN") + " — add the motor and connect this part to its shaft."
-          : "This needs a moving arm: add the motor, then stick pieces onto its shaft. " + moveAdvice(attachBoxes, zone);
+          : (pulling
+            ? "You need a hook that comes DOWN behind the " + check.target + ": add the motor and put the hook on its shaft. "
+            : "This needs a moving arm: add the motor, then stick pieces onto its shaft. ") + moveAdvice(attachBoxes, zones);
       } else if (!armCells.length) {
         text = "Stick pieces onto the motor's shaft (the round end) to make an arm.";
       } else if (angle === 0) {
         text = "Your arm is ready — now set how far the motor turns.";
-      } else {
-        const center = shaftWorld;
+      } else if (lifting) {
         let bestMove = 0;
-        let reached = false;
         for (let k = 1; k <= 12; k++) {
-          const deg = (angle * k) / 12;
           for (const { c } of armCells) {
             const start = [c[0] + 0.5 + tx, c[1] + 0.5, c[2] + 0.5 + lane];
-            const now = rotateAround(start, center, info.motor.axis, deg);
-            if (lifting) {
-              if (inside(start, zone)) bestMove = Math.max(bestMove, now[1] - start[1]);
-            } else if (inside(now, zone) && now[1] < start[1] - 0.2) {
-              reached = true;
-            }
+            if (zones.some((z) => inside(start, z))) bestMove = Math.max(bestMove, armPoint(c, (angle * k) / 12)[1] - start[1]);
           }
         }
-        if (lifting) {
-          const inZone = armBoxes.some((b) => boxOverlap(b, zone));
-          if (!inZone) {
-            const other = attachBoxes.some((b) => boxOverlap(b, zone));
-            text = other
-              ? "A piece is in the right spot, but it isn't part of the motor's arm."
-              : "The arm isn't under the " + check.target + " yet. " + moveAdvice(armBoxes, zone) + stopNote;
-          } else if (bestMove >= check.need) {
-            ok = true;
-            text = check.done;
-          } else if (bestMove <= 0) {
-            text = "The arm moves the wrong way. Turn the motor the other way.";
-          } else {
-            text = "It lifts " + bestMove.toFixed(1) + " studs but needs " + check.need + ". Turn the motor more or make the arm longer.";
+        if (hitZone(armBoxes) < 0) {
+          text = hitZone(attachBoxes) >= 0
+            ? "A piece is in the right spot, but it isn't part of the motor's arm."
+            : "The arm isn't under the " + check.target + " yet. " + moveAdvice(armBoxes, zones) + stopNote;
+        } else if (bestMove >= check.need) {
+          ok = true;
+          text = check.done;
+        } else if (bestMove <= 0) {
+          text = "The arm moves the wrong way. Turn the motor the other way.";
+        } else {
+          text = "It lifts " + bestMove.toFixed(1) + " studs but needs " + check.need + ". Turn the motor more or make the arm longer.";
+        }
+      } else {
+        let reached = false;
+        for (let k = 1; k <= 12 && !reached; k++) {
+          for (const { c } of armCells) {
+            const s0 = [c[0] + 0.5 + tx, c[1] + 0.5, c[2] + 0.5 + lane];
+            const now = armPoint(c, (angle * k) / 12);
+            if (now[1] < s0[1] - 0.2 && zones.some((z) => inside(now, z))) { reached = true; break; }
           }
-        } else if (reached) {
+        }
+        if (reached) {
           ok = true;
           text = check.done;
         } else {
           const moved = armCells.map(({ c }) => {
-            const p = rotateAround([c[0] + 0.5 + tx, c[1] + 0.5, c[2] + 0.5 + lane], center, info.motor.axis, angle);
-            return [p[0] - 0.5, p[1] - 0.5, p[2] - 0.5, p[0] + 0.5, p[1] + 0.5, p[2] + 0.5];
+            const q = armPoint(c, angle);
+            return [q[0] - 0.5, q[1] - 0.5, q[2] - 0.5, q[0] + 0.5, q[1] + 0.5, q[2] + 0.5];
           });
-          const goesUp = armCells.every(({ c }) => {
-            const s = [c[0] + 0.5 + tx, c[1] + 0.5, c[2] + 0.5 + lane];
-            return rotateAround(s, center, info.motor.axis, angle)[1] >= s[1];
-          });
+          const goesUp = armCells.every(({ c }) => armPoint(c, angle)[1] >= c[1] + 0.5);
           text = goesUp
-            ? "The arm swings up. Turn the motor the other way to press down."
-            : "The arm doesn't come down on the " + check.target + ". " + moveAdvice(moved, zone);
+            ? "The arm swings up. Turn the motor the other way so it comes down."
+            : (pulling ? "Your hook doesn't come down behind the " : "The arm doesn't come down on the ") + check.target + ". " + moveAdvice(moved, zones) + stopNote;
         }
       }
       if (info.stuck && ok) {
@@ -344,9 +414,9 @@ export function evaluate(mission, build) {
       if (!bad && info.motor && angle && armCells.length) {
         for (let k = 1; k <= 12 && !bad; k++) {
           for (const { c } of armCells) {
-            const p = rotateAround([c[0] + 0.5 + tx, c[1] + 0.5, c[2] + 0.5 + lane], shaftWorld, info.motor.axis, (angle * k) / 12);
-            const s = solids.find((x) => x.protect && inside(p, x.box));
-            if (s) { bad = { s, swing: true }; break; }
+            const q = armPoint(c, (angle * k) / 12);
+            const so = solids.find((x) => x.protect && inside(q, x.box));
+            if (so) { bad = { s: so, swing: true }; break; }
           }
         }
       }
@@ -371,7 +441,7 @@ export function evaluate(mission, build) {
     label: "Height check",
     text: tall ? "Under 12 in. tall (" + inches.toFixed(1) + " in.)." : "Too tall! It's " + inches.toFixed(1) + " in. — the limit is 12 in."
   });
-  res.ok = res.steps.every((s) => s.ok);
+  res.ok = res.steps.every((st) => st.ok);
   return res;
 }
 
@@ -535,6 +605,157 @@ function buildRobot(group, pickables) {
   }
 }
 
+/* ---------- drawing the field and mission models ---------- */
+
+function beamMesh(b, color) {
+  const g = new THREE.Group();
+  const dims = [b[3] - b[0], b[4] - b[1], b[5] - b[2]];
+  const center = [(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2];
+  const body = new THREE.Mesh(new THREE.BoxGeometry(dims[0], dims[1], dims[2]), mat(color));
+  body.position.set(center[0], center[1], center[2]);
+  body.castShadow = true;
+  body.receiveShadow = true;
+  g.add(body);
+  const long = dims.indexOf(Math.max(...dims));
+  const others = [0, 1, 2].filter((a) => a !== long);
+  let holeAxis = others.find((a) => a !== 1 && dims[a] <= 1.05);
+  if (holeAxis === undefined) holeAxis = others.find((a) => dims[a] <= 1.05);
+  const n = Math.min(30, Math.floor(dims[long]));
+  if (holeAxis !== undefined && n >= 2) {
+    const geo = new THREE.CylinderGeometry(0.24, 0.24, dims[holeAxis] + 0.04, 10);
+    if (holeAxis === 0) geo.rotateZ(Math.PI / 2);
+    if (holeAxis === 2) geo.rotateX(Math.PI / 2);
+    const dark = mat(0x1f2937);
+    for (let i = 0; i < n; i++) {
+      const hole = new THREE.Mesh(geo, dark);
+      const pos = center.slice();
+      pos[long] = b[long] + (dims[long] - n) / 2 + i + 0.5;
+      hole.position.set(pos[0], pos[1], pos[2]);
+      g.add(hole);
+    }
+  }
+  return g;
+}
+
+function partMesh(part) {
+  if (part.k === "beam") return beamMesh(part.b, part.color);
+  if (part.k === "cyl") {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(part.r, part.r, part.h, 24), mat(part.color));
+    m.position.set(part.c[0], part.c[1] + part.h / 2, part.c[2]);
+    m.castShadow = true;
+    return m;
+  }
+  if (part.k === "ball") {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(part.r, 18, 12), mat(part.color));
+    m.position.set(part.c[0], part.c[1], part.c[2]);
+    m.castShadow = true;
+    return m;
+  }
+  const m = boxMesh(part.b, mat(part.color));
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return m;
+}
+
+// Build one mission model. If `inst` is given, remember its moving groups and targets.
+function buildModel(def, inst) {
+  const root = new THREE.Group();
+  const subs = {};
+  const sub = (name) => {
+    if (!name) return root;
+    if (!subs[name]) {
+      const g = new THREE.Group();
+      const pv = (def.groups && def.groups[name] && def.groups[name].pivot) || [0, 0, 0];
+      g.position.set(pv[0], pv[1], pv[2]);
+      g.userData.pivot = pv;
+      root.add(g);
+      subs[name] = g;
+    }
+    return subs[name];
+  };
+  for (const part of def.parts) {
+    const parent = sub(part.g);
+    const m = partMesh(part);
+    const pv = parent === root ? [0, 0, 0] : parent.userData.pivot;
+    m.position.x -= pv[0];
+    m.position.y -= pv[1];
+    m.position.z -= pv[2];
+    if (inst && part.target) {
+      m.traverse((o) => {
+        if (o.isMesh && o.material.color && o.material.color.getHex() !== 0x1f2937) {
+          o.material = o.material.clone();
+          o.userData.pulse = true;
+          inst.pulse.push(o);
+        }
+      });
+    }
+    parent.add(m);
+  }
+  if (inst) {
+    inst.root = root;
+    inst.groups = subs;
+    for (const g of Object.values(subs)) g.userData.orig = { p: g.position.clone(), q: g.quaternion.clone() };
+  }
+  return root;
+}
+
+function buildField(parent, FIELD) {
+  const [W, D] = FIELD.size;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W + 200, D + 200), new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 1 }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(W / 2, -0.05, D / 2);
+  floor.receiveShadow = true;
+  parent.add(floor);
+  const matMesh = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ color: 0x5c9e3f, roughness: 0.95 }));
+  matMesh.rotation.x = -Math.PI / 2;
+  matMesh.position.set(W / 2, 0, D / 2);
+  matMesh.receiveShadow = true;
+  parent.add(matMesh);
+  const grid = new THREE.GridHelper(Math.max(W, D), Math.round(Math.max(W, D) / 8), 0x7cb860, 0x6aaa4f);
+  grid.position.set(W / 2, 0.01, D / 2);
+  grid.scale.set(W / Math.max(W, D), 1, D / Math.max(W, D));
+  parent.add(grid);
+
+  for (const home of FIELD.homes) {
+    const left = home.x === 0;
+    const shape = new THREE.Shape();
+    const cx = home.x, cy = -D;
+    shape.moveTo(cx, cy);
+    shape.absarc(cx, cy, FIELD.homeRadius, left ? 0 : Math.PI / 2, left ? Math.PI / 2 : Math.PI, false);
+    shape.lineTo(cx, cy);
+    const area = new THREE.Mesh(new THREE.ShapeGeometry(shape, 24), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.9 }));
+    area.rotation.x = -Math.PI / 2;
+    area.position.y = 0.02;
+    area.receiveShadow = true;
+    parent.add(area);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(FIELD.homeRadius - 1.2, FIELD.homeRadius, 40, 1, left ? 0 : Math.PI / 2, Math.PI / 2), new THREE.MeshBasicMaterial({ color: home.color }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(cx, 0.03, D);
+    parent.add(ring);
+  }
+
+  const lineMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const pts of FIELD.lines) {
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const [x0, z0] = pts[i], [x1, z1] = pts[i + 1];
+      const len = Math.hypot(x1 - x0, z1 - z0);
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(len + 2.4, 0.06, 2.4), lineMat);
+      seg.position.set((x0 + x1) / 2, 0.04, (z0 + z1) / 2);
+      seg.rotation.y = -Math.atan2(z1 - z0, x1 - x0);
+      parent.add(seg);
+    }
+  }
+
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.7 });
+  const Hw = FIELD.wallHeight;
+  for (const b of [[-3, 0, -3, W + 3, Hw, 0], [-3, 0, D, W + 3, Hw, D + 3], [-3, 0, 0, 0, Hw, D], [W, 0, 0, W + 3, Hw, D]]) {
+    const w = boxMesh(b, wallMat);
+    w.castShadow = true;
+    w.receiveShadow = true;
+    parent.add(w);
+  }
+}
+
 /* ---------- the builder widget ---------- */
 
 export function createBuilder(root, opts) {
@@ -596,7 +817,7 @@ export function createBuilder(root, opts) {
       h("button", { type: "button", class: "fb-btn", title: "Remove everything", onclick: () => clearAll() }, icon("fa-trash-can"))
     ],
     h("span", { class: "fb-grow" }),
-    ["3D", "Side", "Top", "Front"].map((v) => h("button", { type: "button", class: "fb-btn fb-view", onclick: () => setView(v) }, v)),
+    ["3D", "Side", "Top", "Front", "Field"].map((v) => h("button", { type: "button", class: "fb-btn fb-view", onclick: () => setView(v) }, v)),
     h("button", { type: "button", class: "fb-btn on", title: "Show or hide the goal spot", onclick: (e) => toggleGoal(e.currentTarget) }, icon("fa-bullseye"), " Goal")
   );
 
@@ -634,28 +855,21 @@ export function createBuilder(root, opts) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xe8eef6);
-  const camera = new THREE.PerspectiveCamera(40, 1.6, 0.5, 400);
+  const camera = new THREE.PerspectiveCamera(40, 1.6, 0.5, 2000);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.495;
   controls.minDistance = 12;
-  controls.maxDistance = 140;
+  controls.maxDistance = 420;
 
   scene.add(new THREE.HemisphereLight(0xffffff, 0x94a3b8, 1.1));
   const sun = new THREE.DirectionalLight(0xffffff, 1.6);
   sun.position.set(-20, 50, 30);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
-  Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 140 });
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 200 });
   scene.add(sun);
-
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(160, 100), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.9 }));
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  scene.add(ground);
-  const grid = new THREE.GridHelper(80, 80, 0xcbd5e1, 0xe2e8f0);
-  grid.position.set(5, 0.01, 0);
-  scene.add(grid);
 
   const robotGroup = new THREE.Group();
   const robotPicks = [];
@@ -666,32 +880,37 @@ export function createBuilder(root, opts) {
   robotGroup.add(pivot);
   scene.add(robotGroup);
 
-  // mission model
-  const missionGroup = new THREE.Group();
-  const targets = {};
+  // The whole field, placed so the robot's start pose is the origin.
+  const data = globalThis.FLL_DATA;
+  const world = mission.start ? missionWorld(mission) : null;
+  const inst = { pulse: [], groups: {}, root: null };
+  const fieldRoot = new THREE.Group();
+  fieldRoot.matrixAutoUpdate = false;
   const goalGroup = new THREE.Group();
-  if (mission.sim) {
-    for (const s of mission.sim.solids) {
-      const mesh = boxMesh(s.box, mat(s.color || 0x9ca3af, s.target ? { emissive: 0x000000 } : undefined));
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      if (s.target) {
-        mesh.material = mesh.material.clone();
-        mesh.userData.pulse = true;
+  if (world) {
+    const hd = (mission.start.h * Math.PI) / 180;
+    fieldRoot.matrix.copy(new THREE.Matrix4().makeRotationY(-hd).multiply(new THREE.Matrix4().makeTranslation(-mission.start.x, 0, -mission.start.z)));
+    buildField(fieldRoot, data.FIELD);
+    for (const pl of world.placements) {
+      const def = data.MODELS[pl.model];
+      if (!def) continue;
+      const own = pl.model === mission.model;
+      const g = buildModel(def, own ? inst : null);
+      g.position.set(pl.x, 0, pl.z);
+      g.rotation.y = ((pl.rot || 0) * Math.PI) / 180;
+      fieldRoot.add(g);
+    }
+    for (const c of mission.checks || []) {
+      for (const z of zonesOf(c)) {
+        const zm = boxMesh(z, new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.28, depthWrite: false }));
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(zm.geometry), new THREE.LineBasicMaterial({ color: 0x15803d }));
+        edges.position.copy(zm.position);
+        goalGroup.add(zm, edges);
       }
-      missionGroup.add(mesh);
-      if (!targets[s.name]) targets[s.name] = [];
-      targets[s.name].push(mesh);
     }
-    for (const c of mission.sim.checks) {
-      if (!c.zone) continue;
-      const zm = boxMesh(c.zone, new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.22, depthWrite: false }));
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(zm.geometry), new THREE.LineBasicMaterial({ color: 0x16a34a }));
-      edges.position.copy(zm.position);
-      goalGroup.add(zm, edges);
-    }
+    if (inst.root) inst.root.add(goalGroup);
   }
-  scene.add(missionGroup, goalGroup);
+  scene.add(fieldRoot);
 
   const ghost = new THREE.Group();
   ghost.visible = false;
@@ -856,8 +1075,28 @@ export function createBuilder(root, opts) {
     Front: [[20, 14, 16], [-1, 6, 0]]
   };
 
+  function fieldView() {
+    // Whole field from above-front, in the robot's frame.
+    const [W, D] = data.FIELD.size;
+    const c = new THREE.Vector3(W / 2, 0, D / 2).applyMatrix4(fieldRoot.matrix);
+    const eye = new THREE.Vector3(W / 2, 230, D + 120).applyMatrix4(fieldRoot.matrix);
+    return [[eye.x, eye.y, eye.z], [c.x, 0, c.z]];
+  }
+
+  // Keep the camera over the table: if the usual side is outside the walls, look from the other side.
+  function onTable(p) {
+    if (!world) return true;
+    const [W, D] = data.FIELD.size;
+    const w = new THREE.Vector3(p[0], p[1], p[2]).applyMatrix4(fieldRoot.matrix.clone().invert());
+    return w.x > -2 && w.x < W + 2 && w.z > -2 && w.z < D + 2;
+  }
+
   function setView(v) {
-    const [p, t] = VIEWS[v];
+    let [p, t] = v === "Field" && world ? fieldView() : VIEWS[v] || VIEWS["3D"];
+    if (v !== "Field" && v !== "Top" && !onTable(p)) {
+      const flipped = [p[0], p[1], -p[2]];
+      p = onTable(flipped) ? flipped : [p[0], p[1] + 20, p[2]];
+    }
     camera.position.set(p[0], p[1], p[2]);
     controls.target.set(t[0], t[1], t[2]);
     controls.update();
@@ -1024,16 +1263,39 @@ export function createBuilder(root, opts) {
   }
 
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  let movedTargets = [];
+  let dropped = [];
 
   function resetScene() {
     if (!resetPending && !state.testing) return;
     resetPending = false;
     robotGroup.position.set(0, 0, state.build.lane);
-    for (const [mesh, pos, rot] of movedTargets) { mesh.position.copy(pos); mesh.rotation.copy(rot); }
-    movedTargets = [];
-    missionGroup.children.filter((o) => o.userData.dropped).forEach((o) => missionGroup.remove(o));
+    for (const g of Object.values(inst.groups)) {
+      g.position.copy(g.userData.orig.p);
+      g.quaternion.copy(g.userData.orig.q);
+    }
+    dropped.forEach((o) => o.parent && o.parent.remove(o));
+    dropped = [];
     rebuildPieces();
+  }
+
+  const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) };
+
+  // Move/turn one of the mission model's moving groups (model coordinates).
+  function playStep(step, ms) {
+    const g = inst.groups[step.g];
+    if (!g) return Promise.resolve();
+    const p0 = g.position.clone();
+    const q0 = g.quaternion.clone();
+    const pv = step.rot && step.rot.pivot ? new THREE.Vector3().fromArray(step.rot.pivot) : g.position.clone();
+    const mv = step.move ? new THREE.Vector3().fromArray(step.move) : null;
+    return tween(ms, (k) => {
+      if (step.rot) {
+        const q = new THREE.Quaternion().setFromAxisAngle(AXES[step.rot.axis], (step.rot.deg * Math.PI * k) / 180);
+        g.quaternion.copy(q).multiply(q0);
+        g.position.copy(p0).sub(pv).applyQuaternion(q).add(pv);
+      }
+      if (mv) g.position.copy(p0).addScaledVector(mv, k);
+    });
   }
 
   async function runTest() {
@@ -1045,62 +1307,50 @@ export function createBuilder(root, opts) {
     state.testing = true;
     testBtn.disabled = true;
     result.replaceChildren(h("p", { class: "fb-running" }, icon("fa-spinner fa-spin"), " Testing…"));
+    // Frame the spot where the robot will meet the mission model.
     setView("3D");
-    controls.target.set(10, 5, state.build.lane);
+    const follow = Math.max(0, res.tx || 0);
+    camera.position.x += follow;
+    controls.target.set(10 + follow, 5, state.build.lane);
     controls.update();
 
     const lane = state.build.lane;
     if (res.steps.length && res.info) {
       if (res.startX < 0) await tween(500, (k) => robotGroup.position.set(res.startX * k, 0, lane));
-      await tween(Math.max(600, res.t * 70), (k) => robotGroup.position.set(res.startX + res.t * k, 0, lane));
+      await tween(Math.max(600, res.t * 60), (k) => robotGroup.position.set(res.startX + res.t * k, 0, lane));
       const axis = armSetup();
-      const passed = new Set(res.passed.map((c) => c.type));
-      const liftCheck = res.passed.find((c) => c.type === "lift");
-      const pressCheck = res.passed.find((c) => c.type === "press");
-      const remember = (mesh) => { if (!movedTargets.some((m) => m[0] === mesh)) movedTargets.push([mesh, mesh.position.clone(), mesh.rotation.clone()]); };
       if (axis && res.angle) {
         const target = (res.angle * Math.PI) / 180;
-        const lifted = liftCheck ? targets[liftCheck.target] || [] : [];
-        const pressed = pressCheck ? targets[pressCheck.target] || [] : [];
-        [...lifted, ...pressed].forEach(remember);
-        const base = new Map([...lifted, ...pressed].map((m) => [m, m.position.clone()]));
-        await tween(900, (k) => {
-          pivot.quaternion.setFromAxisAngle(axis, target * k);
-          lifted.forEach((m) => { m.position.y = base.get(m).y + (liftCheck.need + 0.5) * k; });
-          pressed.forEach((m) => { m.position.y = base.get(m).y - 1.5 * k; });
-        });
+        await tween(900, (k) => pivot.quaternion.setFromAxisAngle(axis, target * k));
       }
-      const push = res.passed.find((c) => c.type === "push");
-      if (push) {
-        const meshes = targets[push.target] || [];
-        meshes.forEach(remember);
-        const base = new Map(meshes.map((m) => [m, m.position.clone()]));
-        const d = push.move || 2;
-        await tween(700, (k) => {
-          robotGroup.position.x = res.tx + d * k;
-          meshes.forEach((m) => { m.position.x = base.get(m).x + d * k; if (push.tip) m.rotation.z = -1.2 * k; });
-        });
+
+      // The mission model reacts the way the real one does.
+      const steps = [];
+      let robotMoves = [];
+      for (const c of res.passed) {
+        for (const st of c.anim || []) steps.push(st.g === "$hit" ? Object.assign({}, st, { g: res.hitGroups[c.label] }) : st);
+        if (c.robot && !robotMoves.length) robotMoves = c.robot;
+        if (c.type === "deliver") {
+          const z = c.zone;
+          const thing = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), mat(c.color || 0xec4899));
+          thing.position.set((z[0] + z[3]) / 2, z[4] + 1, (z[2] + z[5]) / 2);
+          inst.root.add(thing);
+          dropped.push(thing);
+          steps.push({ drop: thing, from: z[4] + 1, to: z[1] + 1 });
+        }
       }
-      const hook = res.passed.find((c) => c.type === "hook");
-      if (hook) {
-        const meshes = targets[hook.target] || [];
-        meshes.forEach(remember);
-        const base = new Map(meshes.map((m) => [m, m.position.clone()]));
-        await tween(900, (k) => {
-          robotGroup.position.x = res.tx - 5 * k;
-          meshes.forEach((m) => { m.position.x = base.get(m).x - 4 * k; m.position.y = base.get(m).y - base.get(m).y * 0.6 * k; });
-        });
+      const first = robotMoves[0] || 0;
+      await Promise.all([
+        ...steps.map((st) => (st.drop ? tween(700, (k) => { st.drop.position.y = st.from + (st.to - st.from) * k; }) : playStep(st, 1000))),
+        first ? tween(1000, (k) => { robotGroup.position.x = res.tx + first * k; }) : null
+      ]);
+      let x = res.tx + first;
+      for (const d of robotMoves.slice(1)) {
+        const from = x;
+        await tween(600, (k) => { robotGroup.position.x = from + d * k; });
+        x += d;
       }
-      const deliver = res.passed.find((c) => c.type === "deliver");
-      if (deliver) {
-        const z = deliver.zone;
-        const thing = new THREE.Mesh(new THREE.SphereGeometry(0.9, 20, 14), mat(deliver.color || 0xec4899));
-        thing.userData.dropped = true;
-        thing.position.set((z[0] + z[3]) / 2, z[4] + 1, (z[2] + z[5]) / 2);
-        missionGroup.add(thing);
-        await tween(700, (k) => { thing.position.y = z[4] + 1 - (z[4] - z[1] + 0.1) * k; });
-      }
-      if (!passed.size) await wait(250);
+      if (!res.passed.length) await wait(250);
     }
 
     showResult(res);
@@ -1138,9 +1388,8 @@ export function createBuilder(root, opts) {
   function frame() {
     if (disposed) return;
     pulseT += 0.05;
-    missionGroup.children.forEach((m) => {
-      if (m.userData.pulse && m.material.emissive) m.material.emissive.setRGB(0.25 + 0.2 * Math.sin(pulseT), 0.18 + 0.15 * Math.sin(pulseT), 0);
-    });
+    const glow = 0.12 + 0.1 * Math.sin(pulseT);
+    inst.pulse.forEach((m) => { if (m.material.emissive) m.material.emissive.setRGB(glow * 1.6, glow, 0); });
     controls.update();
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
