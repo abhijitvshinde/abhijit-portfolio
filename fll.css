@@ -1126,3 +1126,6 @@ button.fll-btn-good{ border:0; }
   .fb-sep{ display:none; }
   .fb-motor input{ width:110px; }
 }
+
+.fll-mh-links{ display:flex; flex-direction:column; gap:8px; }
+@media(max-width:640px){ .fll-mh-links{ flex-direction:row; } }

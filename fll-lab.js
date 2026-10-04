@@ -423,7 +423,12 @@
           h("p", { class: "fll-mh-goal" }, icon("fa-bullseye"), " ", data.goal),
           h("div", { class: "fll-badges" }, badges(data))
         ),
-        h("a", { class: "btn ghost fll-small-btn", href: LINKS.missionsVideo, target: "_blank", rel: "noopener noreferrer" }, icon("fa-circle-play"), " Video")
+        h("div", { class: "fll-mh-links" },
+          h("a", { class: "btn ghost fll-small-btn", href: LINKS.missionsVideo, target: "_blank", rel: "noopener noreferrer" }, icon("fa-circle-play"), " Video"),
+          data.book && window.FLL_DATA.BOOK_URL
+            ? h("a", { class: "btn ghost fll-small-btn", href: window.FLL_DATA.BOOK_URL(data.book), target: "_blank", rel: "noopener noreferrer", title: "Official building instructions for this mission model" }, icon("fa-book"), " Model")
+            : null
+        )
       ),
       mount,
       after

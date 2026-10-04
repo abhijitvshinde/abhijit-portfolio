@@ -461,7 +461,7 @@ window.FLL_DATA = (function () {
     {
       id: "M04", name: "Lucky Leaves", color: "#22c55e", icon: "fa-leaf", noTouch: true, book: "04",
       goal: "Hook a leaf's tan loop and lift it out — don't touch the katydid.", points: "10, +20 bonus",
-      model: "leaves", start: { x: 26, z: 42, h: 90 },
+      model: "leaves", start: { x: 32, z: 38, h: 90 },
       checks: [
         {
           type: "hook", label: "Take a leaf", target: "leaf loop",
