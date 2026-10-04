@@ -192,7 +192,7 @@ def session_key():
     explicit = os.environ.get("SESSION_SECRET")
     if explicit:
         return explicit.encode()
-    token = os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN") or ""
+    token = redis_env()[1] or ""
     return hashlib.sha256(("fll-session:" + token).encode()).digest()
 
 
@@ -334,7 +334,7 @@ class handler(BaseHTTPRequestHandler):
     def _configured(self):
         # With Redis the signing key falls back to the (secret) Redis token; the local
         # dev store has no token, so it needs SESSION_SECRET (tools/dev_server.py sets one).
-        has_key = os.environ.get("SESSION_SECRET") or os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+        has_key = os.environ.get("SESSION_SECRET") or redis_env()[1]
         return bool(
             has_key
             and os.environ.get("ADMIN_USERNAME")
