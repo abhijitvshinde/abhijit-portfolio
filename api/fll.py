@@ -156,9 +156,21 @@ class FileStore:
         return [self.cmd(*c) for c in commands]
 
 
-def get_store():
+def redis_env():
+    """Find the Upstash REST URL/token whatever prefix the Vercel integration used."""
     url = os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")
     token = os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+    if not (url and token):
+        for key, value in os.environ.items():
+            if key.endswith("_REST_API_URL") and value:
+                other = os.environ.get(key[: -len("URL")] + "TOKEN")
+                if other:
+                    return value, other
+    return url, token
+
+
+def get_store():
+    url, token = redis_env()
     if url and token:
         return RedisStore(url, token)
     dev = os.environ.get("FLL_DEV_STORE")
