@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Coach Dashboard | FLL Attachment Lab</title>
+  <meta name="description" content="Coach dashboard for the FLL Attachment Lab: create student logins and review team progress.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="fll.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script>document.documentElement.classList.add('js');</script>
+  <meta name="theme-color" content="#05070f">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    .coach-page{ padding-top:150px; }
+    .coach-grid{ display:grid; grid-template-columns:minmax(0, 380px) minmax(0, 1fr); gap:22px; align-items:start; }
+    .coach-form{ display:grid; gap:8px; }
+    .coach-form label{ font-weight:700; font-size:14px; margin-top:6px; }
+    .coach-inline{ display:flex; gap:8px; flex-wrap:wrap; }
+    .coach-textarea{ width:100%; padding:13px 15px; border-radius:14px; border:1px solid rgba(255,255,255,0.14); background:rgba(2,6,23,0.6); color:var(--text); font:inherit; font-size:15px; resize:vertical; }
+    .coach-textarea:focus{ outline:none; border-color:var(--fll-green); box-shadow:0 0 0 3px rgba(163,230,53,0.18); }
+    .coach-inline input{ flex:1; }
+    .coach-inline .fll-tool-btn{ white-space:nowrap; }
+    .coach-card-out{ margin-top:16px; padding:18px; border-radius:18px; border:2px dashed rgba(163,230,53,0.5); background:rgba(163,230,53,0.06); }
+    .coach-card-out dl{ display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:10px 0 14px; }
+    .coach-card-out dt{ color:var(--muted); font-weight:700; }
+    .coach-card-out dd{ font-family:ui-monospace, Consolas, monospace; font-size:16px; word-break:break-all; }
+    .coach-table-wrap{ overflow-x:auto; }
+    .coach-table{ width:100%; border-collapse:collapse; font-size:14px; }
+    .coach-table th, .coach-table td{ padding:10px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle; }
+    .coach-table th{ color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:0.5px; }
+    .coach-table td .fll-tool-btn{ margin:2px; }
+    .coach-matrix td.cell{ text-align:center; padding:6px 2px; }
+    .coach-matrix .sq{ display:inline-block; width:22px; height:22px; border-radius:6px; background:rgba(255,255,255,0.06); }
+    .sq.st-explore{ background:rgba(56,189,248,0.55); }
+    .sq.st-design{ background:rgba(167,139,250,0.6); }
+    .sq.st-test{ background:rgba(245,158,11,0.65); }
+    .sq.st-ready{ background:#a3e635; }
+    .coach-legend{ display:flex; flex-wrap:wrap; gap:14px; margin:10px 0; font-size:13px; color:var(--muted); }
+    .coach-legend span{ display:inline-flex; align-items:center; gap:6px; }
+    .coach-legend .sq{ width:14px; height:14px; }
+    .coach-toolbar{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .coach-toolbar select{ width:auto !important; min-width:180px; }
+    .coach-mission{ padding:16px; border-radius:16px; border:1px solid var(--line); background:rgba(255,255,255,0.02); margin-bottom:12px; }
+    .coach-mission h4{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+    .coach-mission dl{ display:grid; grid-template-columns:150px 1fr; gap:6px 14px; font-size:14px; line-height:1.5; }
+    .coach-mission dt{ color:var(--muted); font-weight:700; }
+    .coach-mission dd{ white-space:pre-wrap; word-break:break-word; }
+    .coach-mission img{ max-width:100%; border-radius:12px; background:#fff; margin-top:6px; }
+    .coach-spoiler{ border-color:rgba(245,158,11,0.4); }
+    #printCard{ display:none; }
+    @media print{
+      body > *:not(#printCard){ display:none !important; }
+      #printCard{ display:block !important; color:#000; font-family:Arial, sans-serif; padding:20px; }
+      #printCard{ display:grid !important; grid-template-columns:1fr 1fr; gap:14px; }
+      #printCard .pc{ border:2px dashed #000; border-radius:12px; padding:14px 18px; break-inside:avoid; }
+      #printCard h2{ font-size:20px; margin-bottom:8px; }
+      #printCard p{ font-size:15px; margin:6px 0; }
+      #printCard code{ font-size:17px; font-weight:bold; word-break:break-all; }
+    }
+    @media(max-width:900px){
+      .coach-grid{ grid-template-columns:1fr; }
+      .coach-mission dl{ grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="noise"></div>
+  <div class="glow glow-one"></div>
+  <div class="glow glow-two"></div>
+
+  <nav class="navbar">
+    <a href="index.html" class="brand">Abhijit Shinde</a>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">HOME</a>
+      <a href="game.html#fll" class="active">KIDS GAME</a>
+    </div>
+    <button class="menu-btn" onclick="toggleMenu()">☰</button>
+  </nav>
+
+  <main class="section coach-page">
+    <p class="section-label">FLL Attachment Lab</p>
+    <h1 class="page-title">Coach Dashboard</h1>
+    <div id="coachApp">
+      <noscript><p class="fll-card">This dashboard needs JavaScript turned on.</p></noscript>
+    </div>
+  </main>
+
+  <div id="printCard"></div>
+
+  <script src="script.js"></script>
+  <script src="fll-missions.js"></script>
+  <script src="fll-coach.js"></script>
+</body>
+</html>
