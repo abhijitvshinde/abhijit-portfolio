@@ -31,6 +31,11 @@ class DevHandler(ApiHandler, SimpleHTTPRequestHandler):
             return ApiHandler.do_GET(self)
         return SimpleHTTPRequestHandler.do_GET(self)
 
+    def end_headers(self):
+        if not self.path.startswith("/api/fll"):
+            self.send_header("Cache-Control", "no-store")  # always serve fresh files while testing
+        SimpleHTTPRequestHandler.end_headers(self)
+
     def do_POST(self):
         if self.path.startswith("/api/fll"):
             return ApiHandler.do_POST(self)

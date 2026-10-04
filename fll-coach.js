@@ -6,18 +6,19 @@
 
 (function () {
   const root = document.getElementById("coachApp");
-  const { MISSIONS, ACTIONS, TOOLS, CHECKLIST, LINKS } = window.FLL_DATA;
-  const ACTION_BY_ID = Object.fromEntries(ACTIONS.map((a) => [a.id, a]));
-  const TOOL_BY_ID = Object.fromEntries(TOOLS.map((t) => [t.id, t]));
+  const { MISSIONS, LINKS } = window.FLL_DATA;
 
   const STATUS = {
     new: ["Not started", "st-new"],
-    exploring: ["Exploring", "st-explore"],
-    designing: ["Designing", "st-design"],
+    building: ["Building", "st-design"],
     testing: ["Testing", "st-test"],
-    ready: ["Ready", "st-ready"]
+    ready: ["Works", "st-ready"]
   };
-  const STEP_NAMES = ["", "Explore", "Detective", "Pick a tool", "Design", "Build & test"];
+  const statusOf = (s) => STATUS[s] || STATUS.new;
+
+  let builderModule = null;
+  const loadBuilder = () => builderModule || (builderModule = import("./fll-builder.js"));
+  let viewers = [];
 
   // Short, easy-to-spell words so 9-11 year olds can remember passwords like "happy-panda-42".
   const WORDS_A = ["red", "blue", "green", "happy", "sunny", "lucky", "super", "funny", "fast", "cool", "brave", "jolly"];
@@ -98,6 +99,8 @@
   /* ---------- render ---------- */
 
   function render() {
+    viewers.forEach((v) => v.dispose());
+    viewers = [];
     const views = { loading: () => h("div", { class: "fll-card fll-center" }, icon("fa-spinner fa-spin"), " Loading…"), login: viewLogin, setup: viewSetup, dash: viewDash, detail: viewDetail };
     root.replaceChildren(views[state.view]());
   }
@@ -367,8 +370,8 @@
           h("tbody", {}, users.map((u) => h("tr", {},
             h("td", {}, h("button", { class: "fll-link-btn", type: "button", onclick: () => openDetail(u.username) }, u.name)),
             MISSIONS.map((m) => {
-              const s = (u.missions[m.id] || {}).status || "new";
-              return h("td", { class: "cell" }, h("span", { class: "sq " + STATUS[s][1], title: u.name + " · " + m.id + " " + m.name + ": " + STATUS[s][0] }));
+              const [label, cls] = statusOf((u.missions[m.id] || {}).status);
+              return h("td", { class: "cell" }, h("span", { class: "sq " + cls, title: u.name + " · " + m.id + " " + m.name + ": " + label }));
             })
           )))
         )
@@ -474,7 +477,10 @@
   function viewDetail() {
     const { user, progress } = state.detail;
     const missions = (progress && progress.missions) || {};
-    const worked = MISSIONS.filter((m) => missions[m.id] && missions[m.id].status && missions[m.id].status !== "new");
+    const worked = MISSIONS.filter((m) => {
+      const r = missions[m.id];
+      return r && ((r.build && r.build.pieces && r.build.pieces.length) || r.tests);
+    });
     return h("div", {},
       h("button", { class: "fll-link-btn fll-back", type: "button", onclick: () => { state.view = "dash"; render(); } }, icon("fa-arrow-left"), " Back to dashboard"),
       h("div", { class: "fll-card" },
@@ -482,46 +488,44 @@
         h("p", { class: "fll-muted" }, "Username: ", h("code", {}, user.username), " · Last saved: ", progress.savedAt ? new Date(progress.savedAt * 1000).toLocaleString() : "never")
       ),
       worked.length
-        ? worked.map((m) => missionDetail(user, m, missions[m.id]))
-        : h("div", { class: "fll-card fll-muted" }, "This student hasn't started any missions yet.")
+        ? worked.map((m) => missionDetail(m, missions[m.id]))
+        : h("div", { class: "fll-card fll-muted" }, "This student hasn't built anything yet.")
     );
   }
 
-  function missionDetail(user, m, r) {
-    const [label, cls] = STATUS[r.status] || STATUS.new;
-    const last5 = (r.trials || []).slice(-5);
-    const checks = CHECKLIST.map((c) => c.id).concat(m.noTouch ? ["notouch"] : []);
-    const checked = checks.filter((c) => r.checklist && r.checklist[c]).length;
-    const row = (k, v) => (v === "" || v === null || v === undefined ? null : [h("dt", {}, k), h("dd", {}, v)]);
-    const sketchSlot = h("dd", {});
-    if (r.hasSketch) {
-      sketchSlot.append(h("button", {
-        class: "fll-tool-btn", type: "button",
-        onclick: async (e) => {
-          e.target.disabled = true;
-          try {
-            const data = await api("sketch", { query: { mission: m.id, username: user.username } });
-            sketchSlot.replaceChildren(data.image ? h("img", { src: data.image, alt: user.name + "'s sketch for " + m.name }) : "No sketch saved.");
-          } catch (err) { sketchSlot.textContent = err.message; }
+  function missionDetail(m, r) {
+    const [label, cls] = statusOf(r.status);
+    const build = r.build || { pieces: [] };
+    const pieces = (build.pieces || []).length;
+    const motor = (build.pieces || []).some((p) => p.t === "motor");
+    const real = r.realTries || [];
+    const row = (k, v) => [h("dt", {}, k), h("dd", {}, v)];
+    const slot = h("div", { class: "coach-viewer" });
+    const showBtn = h("button", {
+      class: "fll-tool-btn", type: "button",
+      onclick: async () => {
+        showBtn.disabled = true;
+        slot.replaceChildren(h("p", { class: "fll-muted" }, icon("fa-spinner fa-spin"), " Loading 3D view…"));
+        try {
+          const mod = await loadBuilder();
+          viewers.push(mod.createBuilder(slot, { mission: m, build, readOnly: true }));
+          showBtn.remove();
+        } catch (e) {
+          slot.replaceChildren(h("p", { class: "fll-msg" }, "The 3D view couldn't load."));
+          showBtn.disabled = false;
         }
-      }, icon("fa-image"), " Show sketch"));
-    }
+      }
+    }, icon("fa-cube"), " Open 3D build");
     return h("div", { class: "coach-mission" },
-      h("h4", {}, m.id + " " + m.name, h("span", { class: "fll-status " + cls }, label), h("span", { class: "fll-muted small" }, "Step " + (r.step || 1) + ": " + STEP_NAMES[r.step || 1])),
+      h("h4", {}, m.id + " " + m.name, h("span", { class: "fll-status " + cls }, label)),
       h("dl", {},
-        row("Moves picked", (r.actions || []).map((a) => (ACTION_BY_ID[a] || {}).label || a).join(", ") + (r.actionsDone ? "  ✓" : "") + (r.actionTries ? "  (" + r.actionTries + " wrong tries)" : "")),
-        row("Touch plan", r.touchPlan),
-        row("Tools picked", (r.tools || []).map((t) => (TOOL_BY_ID[t] || {}).name || t).join(", ")),
-        row("Motor?", r.power === "motor" ? "Uses a motor" : r.power === "passive" ? "No motor" : ""),
-        row("Safe-path plan", r.pathPlan),
-        row("Design", r.design && r.design.desc),
-        row("Parts", r.design && (r.design.parts || []).join(", ")),
-        row("Attaches by", r.design && r.design.connect),
-        r.hasSketch ? [h("dt", {}, "Sketch"), sketchSlot] : null,
-        r.step >= 5 ? row("Checklist", checked + " / " + checks.length + " checked") : null,
-        (r.trials || []).length ? row("Tests", (r.trials || []).length + " runs · last 5: " + last5.filter(Boolean).length + "/" + last5.length + " worked") : null,
-        (r.changes || []).length ? row("Changes", r.changes.map((c) => new Date(c.at).toLocaleDateString() + " – " + c.text).join("\n")) : null
-      )
+        row("Pieces", pieces + (motor ? " (with motor, turns " + (build.motorAngle || 0) + "°)" : " (no motor)")),
+        row("Tests", String(r.tests || 0) + (r.tests ? (r.lastOk ? " · last test worked" : " · last test didn't work") : "")),
+        row("Virtual test", r.passed ? "Passed ★" : "Not passed yet"),
+        real.length ? row("Real robot", real.filter(Boolean).length + " of " + real.length + " tries worked") : null
+      ),
+      pieces ? showBtn : null,
+      slot
     );
   }
 

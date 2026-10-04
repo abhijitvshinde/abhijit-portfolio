@@ -3,7 +3,7 @@
 The **Kids Game** page (`game.html`) has two tabs:
 
 - **What I Do Next?**: the original underwater-robot game.
-- **FLL Attachment Lab**: kids pick a BIOGLOW mission and go through five steps: Explore, Detective, Pick a tool, Design (with a sketch pad) and Build & test.
+- **FLL Attachment Lab**: kids pick a BIOGLOW mission, snap Technic-style pieces (beams, L-beams, axles, frame, panel, gear, motor) onto a 3D SPIKE Prime robot, and press **Test it!** to watch the robot try a simplified model of the mission. The test checks reach, height, line-up and motor movement, and says what to change ("2 studs higher", "turn the motor the other way").
 
 Student logins and saved progress are handled by a small Python function (`api/fll.py`) and stored in an Upstash Redis database. Until the steps below are done, the lab still works in "guest" mode, but nothing is saved.
 
@@ -47,4 +47,4 @@ Then open http://localhost:8000/game.html#fll. The local server stores data in `
 
 ## Updating mission content
 
-All mission text, hints, the "right" moves and the recommended tools are in `fll-missions.js`. If FIRST publishes a Challenge Update, edit the matching mission there. Mission summaries are written in our own words. The official Robot Game Rulebook and Challenge Updates are always the authority.
+Mission goals and the simplified 3D test models are in `fll-missions.js` (each mission's `sim`: boxes in LEGO studs, plus the goal spot and check type: `lift`, `press`, `push`, `hook`, `deliver` or `avoid`). The 3D builder and the test logic are in `fll-builder.js`. If FIRST publishes a Challenge Update, edit the matching mission there. Mission summaries are written in our own words. The official Robot Game Rulebook and Challenge Updates are always the authority.

@@ -9,6 +9,14 @@
   <meta name="robots" content="noindex, nofollow">
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="fll.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script>document.documentElement.classList.add('js');</script>
   <meta name="theme-color" content="#05070f">
@@ -51,7 +59,7 @@
     .coach-mission dl{ display:grid; grid-template-columns:150px 1fr; gap:6px 14px; font-size:14px; line-height:1.5; }
     .coach-mission dt{ color:var(--muted); font-weight:700; }
     .coach-mission dd{ white-space:pre-wrap; word-break:break-word; }
-    .coach-mission img{ max-width:100%; border-radius:12px; background:#fff; margin-top:6px; }
+    .coach-viewer{ margin-top:12px; }
     .coach-spoiler{ border-color:rgba(245,158,11,0.4); }
     #printCard{ display:none; }
     @media print{

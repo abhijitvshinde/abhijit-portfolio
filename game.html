@@ -11,6 +11,14 @@
   <meta name="robots" content="index, follow">
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="fll.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script>document.documentElement.classList.add('js');</script>
   <meta name="theme-color" content="#05070f">
@@ -202,9 +210,9 @@
       <h2 class="game-title fll-title">FLL Attachment Lab</h2>
 
       <p class="page-intro">
-        Get your <strong>SPIKE Prime</strong> robot ready for the <strong>BIOGLOW</strong> robot game!
-        Pick a mission, figure out what your robot has to do, choose the right kind of attachment,
-        sketch your design, then build it with real LEGO and test it until it works every time.
+        Build attachments for your <strong>SPIKE Prime</strong> robot in 3D: snap LEGO beams, axles, panels
+        and a motor onto the robot, then test them on the <strong>BIOGLOW</strong> missions. When it works,
+        build it for real!
       </p>
 
       <div id="fllApp">
@@ -214,12 +222,13 @@
       <section class="game-notes">
         <h2>For Parents &amp; Coaches</h2>
         <p>
-          The Attachment Lab guides students through the engineering design process for each of the 15
-          BIOGLOW missions. It asks questions and teaches attachment patterns (hooks, lifters, pushers,
-          drop boxes) but never gives a finished solution, so the robot stays the kids' own work. Students
-          log in with accounts their coach creates, and coaches can review every student's answers,
-          sketches and test logs from the <a href="fll-coach.html">coach dashboard</a>. Mission summaries
-          are written in our own words. The official FIRST&reg; LEGO&reg; League Robot Game Rulebook and
+          In the Attachment Lab, students build attachments from Technic-style pieces on a 3D SPIKE Prime
+          robot and test them against simplified models of the 15 BIOGLOW missions. The test checks
+          reach, height, alignment and motor movement, and tells kids what to change ("2 studs higher",
+          "turn the motor the other way") without giving a finished solution. Students log in with
+          accounts their coach creates, and coaches can open every student's 3D build and test results
+          from the <a href="fll-coach.html">coach dashboard</a>. The mission models are simplified, so
+          always try the real attachment on the real field. The official FIRST&reg; LEGO&reg; League Robot Game Rulebook and
           Challenge Updates are always the final authority. This is an independent learning tool and is
           not affiliated with or endorsed by <em>FIRST</em> or the LEGO Group.
         </p>
