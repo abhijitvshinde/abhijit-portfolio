@@ -19,10 +19,11 @@
   };
   const STEP_NAMES = ["", "Explore", "Detective", "Pick a tool", "Design", "Build & test"];
 
-  const WORDS_A = ["green", "brave", "quick", "happy", "sunny", "clever", "mighty", "lucky", "jolly", "swift", "bright", "cosmic"];
-  const WORDS_B = ["tiger", "river", "robot", "falcon", "gecko", "comet", "panda", "rocket", "otter", "maple", "jaguar", "toucan"];
+  // Short, easy-to-spell words so 9-11 year olds can remember passwords like "happy-panda-42".
+  const WORDS_A = ["red", "blue", "green", "happy", "sunny", "lucky", "super", "funny", "fast", "cool", "brave", "jolly"];
+  const WORDS_B = ["cat", "dog", "frog", "lion", "tiger", "panda", "robot", "rocket", "star", "moon", "fish", "duck"];
 
-  const state = { view: "loading", users: [], team: "", lastCard: null, detail: null, error: "" };
+  const state = { view: "loading", users: [], team: "", lastCard: null, bulkCards: null, bulkFailed: null, detail: null, error: "" };
 
   /* ---------- helpers ---------- */
 
@@ -73,9 +74,12 @@
     return WORDS_A[randInt(WORDS_A.length)] + "-" + WORDS_B[randInt(WORDS_B.length)] + "-" + (10 + randInt(90));
   }
 
-  function suggestUsername(name) {
-    const base = name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "").slice(0, 16);
-    return base.length >= 2 ? base + (10 + randInt(90)) : "";
+  // Kids log in with just their first name, e.g. "Saanvi" -> "saanvi".
+  function suggestUsername(name, withNumber) {
+    let base = name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "").slice(0, 20);
+    if (!base) return "";
+    if (withNumber || base.length < 3) base += 10 + randInt(90);
+    return base;
   }
 
   function ago(ts) {
@@ -166,7 +170,7 @@
         h("button", { class: "fll-link-btn", type: "button", onclick: logout }, icon("fa-right-from-bracket"), " Log out")
       ),
       h("div", { class: "coach-grid" },
-        h("div", {}, createForm(teams)),
+        h("div", {}, createForm(teams), bulkForm(teams)),
         h("div", {},
           h("div", { class: "fll-card" },
             h("div", { class: "coach-toolbar" },
@@ -238,6 +242,85 @@
     );
   }
 
+  function bulkForm(teams) {
+    const names = h("textarea", { id: "bNames", rows: "8", class: "coach-textarea", placeholder: "One first name per line\nMaya\nLeo\nAisha" });
+    const team = h("input", { type: "text", id: "bTeam", maxlength: "40", list: "teamList", placeholder: "e.g. Robo Rangers", value: state.team || state.lastTeam || "" });
+    const msg = h("p", { class: "fll-msg", role: "alert" });
+    const btn = h("button", { class: "btn primary", type: "submit" }, icon("fa-users"), " Create all logins");
+
+    const form = h("form", {
+      class: "coach-form",
+      onsubmit: async (e) => {
+        e.preventDefault();
+        const list = [...new Set(names.value.split(/[\n,]+/).map((n) => n.trim()).filter(Boolean))];
+        if (!list.length) { msg.textContent = "Type at least one name."; return; }
+        if (list.length > 60) { msg.textContent = "Please add 60 or fewer at a time."; return; }
+        btn.disabled = true;
+        const made = [];
+        const failed = [];
+        for (let i = 0; i < list.length; i++) {
+          const name = list[i].slice(0, 40);
+          msg.textContent = "Creating " + (i + 1) + " of " + list.length + "…";
+          const password = makePassword();
+          let error = "username taken";
+          for (let attempt = 0; attempt < 4; attempt++) {
+            const username = suggestUsername(name, attempt > 0);
+            try {
+              await api("create_user", { method: "POST", body: { name, team: team.value, username, password } });
+              made.push({ name, team: team.value, username, password });
+              error = null;
+              break;
+            } catch (err) {
+              if (err.status !== 409) { error = err.message; break; }
+            }
+          }
+          if (error) failed.push(name + " (" + error + ")");
+        }
+        state.bulkCards = made;
+        state.bulkFailed = failed;
+        state.lastTeam = team.value;
+        await loadUsers();
+      }
+    },
+      h("label", { for: "bNames" }, "Student first names (one per line)"), names,
+      h("label", { for: "bTeam" }, "Team (optional)"), team,
+      btn, msg
+    );
+
+    return h("div", { class: "fll-card" },
+      h("h3", {}, icon("fa-users"), " Add many students"),
+      h("p", { class: "fll-muted small" }, "Usernames are the student's first name. Easy passwords like happy-panda-42 are made for you."),
+      form,
+      state.bulkFailed && state.bulkFailed.length ? h("p", { class: "fll-note warn" }, icon("fa-triangle-exclamation"), " Not created: " + state.bulkFailed.join(", ")) : null,
+      state.bulkCards && state.bulkCards.length ? bulkCards(state.bulkCards) : null
+    );
+  }
+
+  function bulkCards(cards) {
+    const text = "FLL Attachment Lab logins\nWebsite: " + siteUrl() + "\n\n" +
+      cards.map((c) => c.name + "  |  username: " + c.username + "  |  password: " + c.password).join("\n");
+    const copyBtn = h("button", {
+      class: "fll-tool-btn", type: "button",
+      onclick: async () => {
+        try { await navigator.clipboard.writeText(text); copyBtn.textContent = "Copied ✓"; } catch (e) { copyBtn.textContent = "Copy failed"; }
+      }
+    }, icon("fa-copy"), " Copy all");
+    return h("div", { class: "coach-card-out" },
+      h("strong", {}, icon("fa-id-card"), " " + cards.length + " login" + (cards.length === 1 ? "" : "s") + " created"),
+      h("div", { class: "coach-table-wrap" },
+        h("table", { class: "coach-table" },
+          h("thead", {}, h("tr", {}, h("th", {}, "Name"), h("th", {}, "Username"), h("th", {}, "Password"))),
+          h("tbody", {}, cards.map((c) => h("tr", {}, h("td", {}, c.name), h("td", {}, h("code", {}, c.username)), h("td", {}, h("code", {}, c.password)))))
+        )
+      ),
+      h("p", { class: "fll-note warn" }, icon("fa-triangle-exclamation"), " Copy or print these now. Passwords can't be shown again — but you can always reset one."),
+      h("div", { class: "coach-inline" },
+        copyBtn,
+        h("button", { class: "fll-tool-btn", type: "button", onclick: () => printCards(cards) }, icon("fa-print"), " Print cards"),
+        h("button", { class: "fll-tool-btn", type: "button", onclick: () => { state.bulkCards = null; state.bulkFailed = null; render(); } }, icon("fa-xmark"), " Done"))
+    );
+  }
+
   function loginCard(c) {
     const text = "FLL Attachment Lab login for " + c.name + "\nWebsite: " + siteUrl() + "\nUsername: " + c.username + "\nPassword: " + c.password;
     const copyBtn = h("button", {
@@ -256,21 +339,21 @@
       h("p", { class: "fll-note warn" }, icon("fa-triangle-exclamation"), " Copy or print this now. Passwords are stored securely and can't be shown again — but you can always reset one."),
       h("div", { class: "coach-inline" },
         copyBtn,
-        h("button", { class: "fll-tool-btn", type: "button", onclick: () => printCard(c) }, icon("fa-print"), " Print"),
+        h("button", { class: "fll-tool-btn", type: "button", onclick: () => printCards([c]) }, icon("fa-print"), " Print"),
         h("button", { class: "fll-tool-btn", type: "button", onclick: () => { state.lastCard = null; render(); } }, icon("fa-xmark"), " Done"))
     );
   }
 
-  function printCard(c) {
+  function printCards(cards) {
     const pc = document.getElementById("printCard");
-    pc.replaceChildren(h("div", { class: "pc" },
+    pc.replaceChildren(...cards.map((c) => h("div", { class: "pc" },
       h("h2", {}, "FLL Attachment Lab"),
       h("p", {}, "Hi ", h("strong", {}, c.name), "! Here is your login."),
       h("p", {}, "Website: ", h("code", {}, siteUrl())),
       h("p", {}, "Username: ", h("code", {}, c.username)),
       h("p", {}, "Password: ", h("code", {}, c.password)),
       h("p", {}, "Keep this card safe and don't share your password.")
-    ));
+    )));
     window.print();
   }
 

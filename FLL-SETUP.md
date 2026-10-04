@@ -25,7 +25,7 @@ Student logins and saved progress are handled by a small Python function (`api/f
 ## Using it
 
 1. Open `https://www.abhijitvshinde.com/fll-coach.html` and log in with your `ADMIN_USERNAME` and `ADMIN_PASSWORD`.
-2. Add each student with their first name, team, username and password. A password is generated for you.
+2. Paste all first names into **Add many students** (or add one at a time). Usernames are the first names in lowercase, and easy passwords like `happy-panda-42` are generated.
    Copy or print the login card right away: passwords are stored hashed, so they can't be shown again. You can always **Reset** a password.
 3. Students go to **Kids Game → FLL Attachment Lab** and log in.
 4. On the dashboard, the **Team progress** grid shows every student × mission. Click a name to see their answers, design notes, sketches and test logs.

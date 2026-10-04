@@ -21,7 +21,9 @@
     .coach-grid{ display:grid; grid-template-columns:minmax(0, 380px) minmax(0, 1fr); gap:22px; align-items:start; }
     .coach-form{ display:grid; gap:8px; }
     .coach-form label{ font-weight:700; font-size:14px; margin-top:6px; }
-    .coach-inline{ display:flex; gap:8px; }
+    .coach-inline{ display:flex; gap:8px; flex-wrap:wrap; }
+    .coach-textarea{ width:100%; padding:13px 15px; border-radius:14px; border:1px solid rgba(255,255,255,0.14); background:rgba(2,6,23,0.6); color:var(--text); font:inherit; font-size:15px; resize:vertical; }
+    .coach-textarea:focus{ outline:none; border-color:var(--fll-green); box-shadow:0 0 0 3px rgba(163,230,53,0.18); }
     .coach-inline input{ flex:1; }
     .coach-inline .fll-tool-btn{ white-space:nowrap; }
     .coach-card-out{ margin-top:16px; padding:18px; border-radius:18px; border:2px dashed rgba(163,230,53,0.5); background:rgba(163,230,53,0.06); }
@@ -55,10 +57,11 @@
     @media print{
       body > *:not(#printCard){ display:none !important; }
       #printCard{ display:block !important; color:#000; font-family:Arial, sans-serif; padding:20px; }
-      #printCard .pc{ border:2px dashed #000; border-radius:12px; padding:18px 22px; max-width:420px; }
+      #printCard{ display:grid !important; grid-template-columns:1fr 1fr; gap:14px; }
+      #printCard .pc{ border:2px dashed #000; border-radius:12px; padding:14px 18px; break-inside:avoid; }
       #printCard h2{ font-size:20px; margin-bottom:8px; }
       #printCard p{ font-size:15px; margin:6px 0; }
-      #printCard code{ font-size:18px; font-weight:bold; }
+      #printCard code{ font-size:17px; font-weight:bold; word-break:break-all; }
     }
     @media(max-width:900px){
       .coach-grid{ grid-template-columns:1fr; }
