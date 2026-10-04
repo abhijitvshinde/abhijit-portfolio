@@ -9,7 +9,8 @@ One endpoint, routed by ?action=...
 Required environment variables (set in Vercel -> Project -> Settings -> Environment Variables):
   ADMIN_USERNAME      coach login name
   ADMIN_PASSWORD      coach password
-  SESSION_SECRET      long random string used to sign login cookies
+  SESSION_SECRET      optional; long random string used to sign login cookies. If unset,
+                      a key is derived from the Redis token (which is already secret).
   KV_REST_API_URL / KV_REST_API_TOKEN   (added automatically by the Upstash Redis integration;
   UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN are accepted too)
 
@@ -187,8 +188,16 @@ def admin_version():
     return hashlib.sha256(os.environ.get("ADMIN_PASSWORD", "").encode()).hexdigest()[:10]
 
 
+def session_key():
+    explicit = os.environ.get("SESSION_SECRET")
+    if explicit:
+        return explicit.encode()
+    token = os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN") or ""
+    return hashlib.sha256(("fll-session:" + token).encode()).digest()
+
+
 def sign(payload):
-    secret = os.environ["SESSION_SECRET"].encode()
+    secret = session_key()
     body = b64e(json.dumps(payload, separators=(",", ":")).encode())
     sig = b64e(hmac.new(secret, body.encode(), hashlib.sha256).digest())
     return body + "." + sig
@@ -197,7 +206,7 @@ def sign(payload):
 def verify(token):
     try:
         body, sig = token.split(".", 1)
-        secret = os.environ["SESSION_SECRET"].encode()
+        secret = session_key()
         good = b64e(hmac.new(secret, body.encode(), hashlib.sha256).digest())
         if not hmac.compare_digest(good, sig):
             return None
@@ -323,8 +332,11 @@ class handler(BaseHTTPRequestHandler):
             self._send(500, {"error": "Something went wrong on the server."})
 
     def _configured(self):
+        # With Redis the signing key falls back to the (secret) Redis token; the local
+        # dev store has no token, so it needs SESSION_SECRET (tools/dev_server.py sets one).
+        has_key = os.environ.get("SESSION_SECRET") or os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN")
         return bool(
-            os.environ.get("SESSION_SECRET")
+            has_key
             and os.environ.get("ADMIN_USERNAME")
             and os.environ.get("ADMIN_PASSWORD")
             and get_store()

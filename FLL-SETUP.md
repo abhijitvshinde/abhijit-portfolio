@@ -11,19 +11,14 @@ Student logins and saved progress are handled by a small Python function (`api/f
 
 1. **Add a database.** In the Vercel dashboard, open the project, then go to **Storage** (or **Marketplace**). Choose **Upstash for Redis**, select the free plan, and connect it to this project.
    This adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` to the project automatically.
-2. **Add the coach login and a signing secret.** Go to **Settings → Environment Variables** and add these three variables for Production and Preview:
+2. **Add the coach login.** Go to **Settings → Environment Variables** and add these two variables for Production and Preview:
 
    | Name | Value |
    |---|---|
    | `ADMIN_USERNAME` | your coach username, e.g. `coach` |
-   | `ADMIN_PASSWORD` | a strong password that only you know |
-   | `SESSION_SECRET` | a long random string (see below) |
+   | `ADMIN_PASSWORD` | a strong password that only you know (mark it **Sensitive**) |
 
-   To make a random secret, run:
-
-   ```bash
-   python -c "import secrets; print(secrets.token_urlsafe(48))"
-   ```
+   Optional: `SESSION_SECRET` (a long random string) signs login cookies. If you leave it out, a key is derived from the Redis token instead.
 
 3. **Redeploy** the site (pushing to `main` does this).
 
