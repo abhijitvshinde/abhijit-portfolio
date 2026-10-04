@@ -4,12 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>What I Do Next? | Oil Leak Robot Game | Abhijit V. Shinde</title>
+  <title>Kids Games: What I Do Next? &amp; FLL Attachment Lab | Abhijit V. Shinde</title>
   <meta name="description"
-    content="What I Do Next? — a free interactive game for grades 5-8 where kids instruct an underwater robot through prevention, detection, and mitigation of an oil leak.">
+    content="Free kids' STEM games: What I Do Next?, where kids guide an underwater robot through an oil leak, and the FLL Attachment Lab, where FIRST LEGO League teams design SPIKE Prime attachments for the BIOGLOW missions.">
   <link rel="canonical" href="https://www.abhijitvshinde.com/game.html" />
   <meta name="robots" content="index, follow">
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="fll.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script>document.documentElement.classList.add('js');</script>
   <meta name="theme-color" content="#05070f">
@@ -43,8 +44,24 @@
 
   <main class="section game-page">
 
+    <p class="section-label">Kids Games</p>
+    <h1 class="page-title">Learn by Building Robots</h1>
+
+    <div class="games-tabs" role="tablist" aria-label="Choose a game">
+      <button class="games-tab" type="button" role="tab" id="tab-rov" data-tab="rov" aria-controls="panel-rov" aria-selected="true">
+        <i class="fa-solid fa-water" aria-hidden="true"></i>
+        <span>What I Do Next?<small>Underwater robot · Grades 5–8</small></span>
+      </button>
+      <button class="games-tab" type="button" role="tab" id="tab-fll" data-tab="fll" aria-controls="panel-fll" aria-selected="false" tabindex="-1">
+        <i class="fa-solid fa-leaf" aria-hidden="true"></i>
+        <span>FLL Attachment Lab<small>BIOGLOW 2026–27 · Ages 9–11</small></span>
+      </button>
+    </div>
+
+    <section id="panel-rov" class="games-panel" role="tabpanel" aria-labelledby="tab-rov">
+
     <p class="section-label">For Grades 5–8</p>
-    <h1 class="page-title">What I Do Next?</h1>
+    <h2 class="game-title">What I Do Next?</h2>
 
     <p class="page-intro">
       Meet <strong>ROV-7</strong>, an underwater robot connected to a ship by a zipline data cable.
@@ -177,6 +194,39 @@
       </p>
     </section>
 
+    </section>
+
+    <section id="panel-fll" class="games-panel" role="tabpanel" aria-labelledby="tab-fll" hidden>
+
+      <p class="section-label">FIRST LEGO League Challenge · Ages 9–11</p>
+      <h2 class="game-title fll-title">FLL Attachment Lab</h2>
+
+      <p class="page-intro">
+        Get your <strong>SPIKE Prime</strong> robot ready for the <strong>BIOGLOW</strong> robot game!
+        Pick a mission, figure out what your robot has to do, choose the right kind of attachment,
+        sketch your design, then build it with real LEGO and test it until it works every time.
+      </p>
+
+      <div id="fllApp">
+        <noscript><p class="fll-card">The Attachment Lab needs JavaScript turned on.</p></noscript>
+      </div>
+
+      <section class="game-notes">
+        <h2>For Parents &amp; Coaches</h2>
+        <p>
+          The Attachment Lab guides students through the engineering design process for each of the 15
+          BIOGLOW missions. It asks questions and teaches attachment patterns (hooks, lifters, pushers,
+          drop boxes) but never gives a finished solution, so the robot stays the kids' own work. Students
+          log in with accounts their coach creates, and coaches can review every student's answers,
+          sketches and test logs from the <a href="fll-coach.html">coach dashboard</a>. Mission summaries
+          are written in our own words. The official FIRST&reg; LEGO&reg; League Robot Game Rulebook and
+          Challenge Updates are always the final authority. This is an independent learning tool and is
+          not affiliated with or endorsed by <em>FIRST</em> or the LEGO Group.
+        </p>
+      </section>
+
+    </section>
+
   </main>
 
   <footer class="site-footer">
@@ -203,5 +253,7 @@
 
   <script src="script.js"></script>
   <script src="game.js"></script>
+  <script src="fll-missions.js"></script>
+  <script src="fll-lab.js"></script>
 </body>
 </html>

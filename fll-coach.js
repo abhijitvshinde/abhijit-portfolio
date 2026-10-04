@@ -1,0 +1,466 @@
+/* ==========================================
+   FLL ATTACHMENT LAB — coach dashboard
+   Create student logins, reset passwords, and
+   review each student's mission work.
+========================================== */
+
+(function () {
+  const root = document.getElementById("coachApp");
+  const { MISSIONS, ACTIONS, TOOLS, CHECKLIST, LINKS } = window.FLL_DATA;
+  const ACTION_BY_ID = Object.fromEntries(ACTIONS.map((a) => [a.id, a]));
+  const TOOL_BY_ID = Object.fromEntries(TOOLS.map((t) => [t.id, t]));
+
+  const STATUS = {
+    new: ["Not started", "st-new"],
+    exploring: ["Exploring", "st-explore"],
+    designing: ["Designing", "st-design"],
+    testing: ["Testing", "st-test"],
+    ready: ["Ready", "st-ready"]
+  };
+  const STEP_NAMES = ["", "Explore", "Detective", "Pick a tool", "Design", "Build & test"];
+
+  const WORDS_A = ["green", "brave", "quick", "happy", "sunny", "clever", "mighty", "lucky", "jolly", "swift", "bright", "cosmic"];
+  const WORDS_B = ["tiger", "river", "robot", "falcon", "gecko", "comet", "panda", "rocket", "otter", "maple", "jaguar", "toucan"];
+
+  const state = { view: "loading", users: [], team: "", lastCard: null, detail: null, error: "" };
+
+  /* ---------- helpers ---------- */
+
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v === null || v === undefined || v === false) continue;
+      if (k === "class") el.className = v;
+      else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+      else if (v === true) el.setAttribute(k, "");
+      else el.setAttribute(k, v);
+    }
+    for (const kid of kids.flat()) {
+      if (kid === null || kid === undefined || kid === false) continue;
+      el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+    }
+    return el;
+  }
+  const icon = (n) => h("i", { class: (n.startsWith("fa-brands") ? "" : "fa-solid ") + n, "aria-hidden": "true" });
+
+  async function api(action, opts = {}) {
+    const method = opts.method || "GET";
+    const qs = opts.query ? "&" + new URLSearchParams(opts.query).toString() : "";
+    const res = await fetch("/api/fll?action=" + action + qs, {
+      method,
+      credentials: "same-origin",
+      headers: method === "POST" ? { "Content-Type": "application/json", "X-FLL-Request": "1" } : {},
+      body: method === "POST" ? JSON.stringify(opts.body || {}) : undefined
+    });
+    let data = {};
+    try { data = await res.json(); } catch (e) { /* not JSON */ }
+    if (!res.ok) {
+      const err = new Error(data.error || "Something went wrong.");
+      err.status = res.status;
+      if (res.status === 401 && action !== "login") { state.view = "login"; state.error = "Please log in again."; render(); }
+      throw err;
+    }
+    return data;
+  }
+
+  function randInt(n) {
+    const a = new Uint32Array(1);
+    crypto.getRandomValues(a);
+    return a[0] % n;
+  }
+
+  function makePassword() {
+    return WORDS_A[randInt(WORDS_A.length)] + "-" + WORDS_B[randInt(WORDS_B.length)] + "-" + (10 + randInt(90));
+  }
+
+  function suggestUsername(name) {
+    const base = name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "").slice(0, 16);
+    return base.length >= 2 ? base + (10 + randInt(90)) : "";
+  }
+
+  function ago(ts) {
+    if (!ts) return "never";
+    const s = Date.now() / 1000 - ts;
+    if (s < 90) return "just now";
+    if (s < 3600) return Math.round(s / 60) + " min ago";
+    if (s < 86400) return Math.round(s / 3600) + " h ago";
+    return Math.round(s / 86400) + " days ago";
+  }
+
+  function siteUrl() {
+    return location.origin + "/game.html#fll";
+  }
+
+  /* ---------- render ---------- */
+
+  function render() {
+    const views = { loading: () => h("div", { class: "fll-card fll-center" }, icon("fa-spinner fa-spin"), " Loading…"), login: viewLogin, setup: viewSetup, dash: viewDash, detail: viewDetail };
+    root.replaceChildren(views[state.view]());
+  }
+
+  function viewSetup() {
+    return h("div", { class: "fll-card" },
+      h("h3", {}, icon("fa-plug"), " The save server isn't set up yet"),
+      h("p", { class: "fll-muted" }, "Add an Upstash Redis database to this Vercel project and set ADMIN_USERNAME, ADMIN_PASSWORD and SESSION_SECRET in Vercel → Settings → Environment Variables, then redeploy. See FLL-SETUP.md in the website repository.")
+    );
+  }
+
+  function viewLogin() {
+    const user = h("input", { type: "text", id: "cUser", autocomplete: "username", autocapitalize: "none", required: true });
+    const pass = h("input", { type: "password", id: "cPass", autocomplete: "current-password", required: true });
+    const msg = h("p", { class: "fll-msg", role: "alert" }, state.error);
+    const btn = h("button", { class: "btn primary", type: "submit" }, icon("fa-right-to-bracket"), " Log in");
+    return h("div", { class: "fll-card", style: "max-width:440px" },
+      h("h3", {}, icon("fa-user-shield"), " Coach login"),
+      h("form", {
+        class: "coach-form",
+        onsubmit: async (e) => {
+          e.preventDefault();
+          btn.disabled = true;
+          msg.textContent = "Checking…";
+          try {
+            const data = await api("login", { method: "POST", body: { username: user.value, password: pass.value } });
+            if (data.user.role !== "coach") {
+              await api("logout", { method: "POST" });
+              throw new Error("That's a student account. Students play on the Kids Game page.");
+            }
+            state.error = "";
+            await loadUsers();
+          } catch (err) {
+            msg.textContent = err.message;
+            btn.disabled = false;
+          }
+        }
+      },
+        h("label", { for: "cUser" }, "Username"), user,
+        h("label", { for: "cPass" }, "Password"), pass,
+        btn, msg)
+    );
+  }
+
+  async function loadUsers() {
+    const data = await api("users");
+    state.users = data.users;
+    state.view = "dash";
+    render();
+  }
+
+  async function logout() {
+    try { await api("logout", { method: "POST" }); } catch (e) { /* ignore */ }
+    state.view = "login";
+    state.lastCard = null;
+    render();
+  }
+
+  /* ---------- dashboard ---------- */
+
+  function viewDash() {
+    const teams = [...new Set(state.users.map((u) => u.team).filter(Boolean))].sort();
+    const shown = state.team ? state.users.filter((u) => u.team === state.team) : state.users;
+
+    return h("div", {},
+      h("div", { class: "fll-header" },
+        h("span", { class: "fll-who" }, icon("fa-user-shield"), " Coach"),
+        h("span", { class: "fll-save" }, state.users.length + " student" + (state.users.length === 1 ? "" : "s")),
+        h("button", { class: "fll-link-btn", type: "button", onclick: () => loadUsers() }, icon("fa-rotate"), " Refresh"),
+        h("button", { class: "fll-link-btn", type: "button", onclick: logout }, icon("fa-right-from-bracket"), " Log out")
+      ),
+      h("div", { class: "coach-grid" },
+        h("div", {}, createForm(teams)),
+        h("div", {},
+          h("div", { class: "fll-card" },
+            h("div", { class: "coach-toolbar" },
+              h("h3", {}, icon("fa-table-cells"), " Team progress"),
+              teams.length ? teamFilter(teams) : null
+            ),
+            shown.length ? matrix(shown) : h("p", { class: "fll-muted" }, "No students yet. Add your first student on the left.")
+          ),
+          shown.length ? h("div", { class: "fll-card" }, h("h3", {}, icon("fa-users"), " Students"), studentTable(shown)) : null,
+          resources()
+        )
+      )
+    );
+  }
+
+  function teamFilter(teams) {
+    const sel = h("select", { "aria-label": "Filter by team", onchange: (e) => { state.team = e.target.value; render(); } },
+      h("option", { value: "" }, "All teams"),
+      teams.map((t) => h("option", { value: t, selected: t === state.team }, t)));
+    return sel;
+  }
+
+  function createForm(teams) {
+    const name = h("input", { type: "text", id: "nName", maxlength: "40", required: true, placeholder: "e.g. Maya" });
+    const team = h("input", { type: "text", id: "nTeam", maxlength: "40", list: "teamList", placeholder: "e.g. Robo Rangers", value: state.team || state.lastTeam || "" });
+    const username = h("input", { type: "text", id: "nUser", maxlength: "24", required: true, autocapitalize: "none", spellcheck: "false" });
+    const password = h("input", { type: "text", id: "nPass", maxlength: "64", required: true, value: makePassword(), spellcheck: "false" });
+    const msg = h("p", { class: "fll-msg", role: "alert" });
+    let userEdited = false;
+    username.addEventListener("input", () => { userEdited = true; });
+    name.addEventListener("input", () => { if (!userEdited) username.value = suggestUsername(name.value); });
+
+    const btn = h("button", { class: "btn primary", type: "submit" }, icon("fa-user-plus"), " Create login");
+
+    const form = h("form", {
+      class: "coach-form",
+      onsubmit: async (e) => {
+        e.preventDefault();
+        btn.disabled = true;
+        msg.textContent = "";
+        try {
+          const body = { name: name.value, team: team.value, username: username.value.trim().toLowerCase(), password: password.value };
+          await api("create_user", { method: "POST", body });
+          state.lastCard = { name: body.name, team: body.team, username: body.username, password: body.password, kind: "new" };
+          state.lastTeam = body.team;
+          state.team = state.team && body.team !== state.team ? "" : state.team;
+          await loadUsers();
+        } catch (err) {
+          msg.textContent = err.message;
+          btn.disabled = false;
+        }
+      }
+    },
+      h("label", { for: "nName" }, "Student's first name"), name,
+      h("label", { for: "nTeam" }, "Team (optional)"), team,
+      h("datalist", { id: "teamList" }, teams.map((t) => h("option", { value: t }))),
+      h("label", { for: "nUser" }, "Username"), username,
+      h("label", { for: "nPass" }, "Password"),
+      h("div", { class: "coach-inline" }, password,
+        h("button", { class: "fll-tool-btn", type: "button", onclick: () => { password.value = makePassword(); } }, icon("fa-dice"), " New")),
+      btn, msg
+    );
+
+    return h("div", { class: "fll-card" },
+      h("h3", {}, icon("fa-user-plus"), " Add a student"),
+      h("p", { class: "fll-muted small" }, "Use first names only — no last names, emails or birthdays are needed."),
+      form,
+      state.lastCard ? loginCard(state.lastCard) : null
+    );
+  }
+
+  function loginCard(c) {
+    const text = "FLL Attachment Lab login for " + c.name + "\nWebsite: " + siteUrl() + "\nUsername: " + c.username + "\nPassword: " + c.password;
+    const copyBtn = h("button", {
+      class: "fll-tool-btn", type: "button",
+      onclick: async () => {
+        try { await navigator.clipboard.writeText(text); copyBtn.textContent = "Copied ✓"; } catch (e) { copyBtn.textContent = "Copy failed"; }
+      }
+    }, icon("fa-copy"), " Copy");
+    return h("div", { class: "coach-card-out" },
+      h("strong", {}, icon("fa-id-card"), c.kind === "reset" ? " New password for " : " Login card for ", c.name),
+      h("dl", {},
+        h("dt", {}, "Website"), h("dd", {}, siteUrl()),
+        h("dt", {}, "Username"), h("dd", {}, c.username),
+        h("dt", {}, "Password"), h("dd", {}, c.password)
+      ),
+      h("p", { class: "fll-note warn" }, icon("fa-triangle-exclamation"), " Copy or print this now. Passwords are stored securely and can't be shown again — but you can always reset one."),
+      h("div", { class: "coach-inline" },
+        copyBtn,
+        h("button", { class: "fll-tool-btn", type: "button", onclick: () => printCard(c) }, icon("fa-print"), " Print"),
+        h("button", { class: "fll-tool-btn", type: "button", onclick: () => { state.lastCard = null; render(); } }, icon("fa-xmark"), " Done"))
+    );
+  }
+
+  function printCard(c) {
+    const pc = document.getElementById("printCard");
+    pc.replaceChildren(h("div", { class: "pc" },
+      h("h2", {}, "FLL Attachment Lab"),
+      h("p", {}, "Hi ", h("strong", {}, c.name), "! Here is your login."),
+      h("p", {}, "Website: ", h("code", {}, siteUrl())),
+      h("p", {}, "Username: ", h("code", {}, c.username)),
+      h("p", {}, "Password: ", h("code", {}, c.password)),
+      h("p", {}, "Keep this card safe and don't share your password.")
+    ));
+    window.print();
+  }
+
+  function matrix(users) {
+    return h("div", {},
+      h("div", { class: "coach-legend" },
+        Object.entries(STATUS).map(([k, [label, cls]]) => h("span", {}, h("span", { class: "sq " + cls }), label))),
+      h("div", { class: "coach-table-wrap" },
+        h("table", { class: "coach-table coach-matrix" },
+          h("thead", {}, h("tr", {}, h("th", {}, "Student"), MISSIONS.map((m) => h("th", { title: m.name, class: "cell" }, m.id.slice(1))))),
+          h("tbody", {}, users.map((u) => h("tr", {},
+            h("td", {}, h("button", { class: "fll-link-btn", type: "button", onclick: () => openDetail(u.username) }, u.name)),
+            MISSIONS.map((m) => {
+              const s = (u.missions[m.id] || {}).status || "new";
+              return h("td", { class: "cell" }, h("span", { class: "sq " + STATUS[s][1], title: u.name + " · " + m.id + " " + m.name + ": " + STATUS[s][0] }));
+            })
+          )))
+        )
+      )
+    );
+  }
+
+  function studentTable(users) {
+    return h("div", { class: "coach-table-wrap" },
+      h("table", { class: "coach-table" },
+        h("thead", {}, h("tr", {}, ["Name", "Team", "Username", "Ready", "Working on", "Last active", ""].map((t) => h("th", {}, t)))),
+        h("tbody", {}, users.map((u) => {
+          const statuses = Object.values(u.missions).map((m) => m.status);
+          const ready = statuses.filter((s) => s === "ready").length;
+          const active = statuses.filter((s) => s && s !== "ready" && s !== "new").length;
+          return h("tr", {},
+            h("td", {}, h("strong", {}, u.name)),
+            h("td", {}, u.team || "—"),
+            h("td", {}, h("code", {}, u.username)),
+            h("td", {}, String(ready)),
+            h("td", {}, String(active)),
+            h("td", {}, ago(u.lastActive)),
+            h("td", {},
+              h("button", { class: "fll-tool-btn", type: "button", onclick: () => openDetail(u.username) }, icon("fa-eye"), " View"),
+              h("button", { class: "fll-tool-btn", type: "button", onclick: () => resetPassword(u) }, icon("fa-key"), " Reset"),
+              h("button", { class: "fll-tool-btn", type: "button", onclick: () => deleteUser(u) }, icon("fa-trash-can"), " Delete"))
+          );
+        }))
+      )
+    );
+  }
+
+  async function resetPassword(u) {
+    const pw = prompt("New password for " + u.name + " (6+ characters):", makePassword());
+    if (pw === null) return;
+    try {
+      await api("reset_password", { method: "POST", body: { username: u.username, password: pw } });
+      state.lastCard = { name: u.name, team: u.team, username: u.username, password: pw, kind: "reset" };
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  async function deleteUser(u) {
+    if (!confirm("Delete " + u.name + " (" + u.username + ") and ALL of their work? This can't be undone.")) return;
+    try {
+      await api("delete_user", { method: "POST", body: { username: u.username } });
+      await loadUsers();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  function resources() {
+    const link = (href, ic, text) => h("a", { href, target: "_blank", rel: "noopener noreferrer", class: "fll-resource" }, icon(ic), " ", text);
+    return h("div", {},
+      h("div", { class: "fll-card" },
+        h("h3", {}, icon("fa-book-open"), " Official resources"),
+        h("div", { class: "fll-resources" },
+          link(LINKS.season, "fa-leaf", "BIOGLOW season page"),
+          link(LINKS.rulebook, "fa-file-pdf", "Robot Game Rulebook"),
+          link(LINKS.updates, "fa-file-circle-exclamation", "Challenge Updates"),
+          link(LINKS.missionsVideo, "fa-circle-play", "Missions video"),
+          link(LINKS.fieldSetupVideo, "fa-circle-play", "Field setup video"),
+          link(LINKS.materials, "fa-cubes", "Building instructions & all materials")
+        )
+      ),
+      h("div", { class: "fll-card coach-spoiler" },
+        h("h3", {}, icon("fa-eye-slash"), " Coach-only: community solution videos"),
+        h("p", { class: "fll-muted small" }, "These show complete solutions. They're useful for you to understand a mission — but try not to show them to students before they've designed their own idea."),
+        h("div", { class: "fll-resources" },
+          link("https://www.youtube.com/watch?v=KVfVDjWXRNY", "fa-brands fa-youtube", "BIOGLOW overview"),
+          link("https://www.youtube.com/watch?v=fd2QyWyT3ac", "fa-brands fa-youtube", "Single mission runs"),
+          link("https://www.youtube.com/watch?v=KWLmWv3EbVE", "fa-brands fa-youtube", "M02 Exploding Seeds"),
+          link("https://www.youtube.com/watch?v=2_PzZpxqtqQ", "fa-brands fa-youtube", "M03 Flip the Rock"),
+          link("https://www.youtube.com/watch?v=OyvSaDPghCg", "fa-brands fa-youtube", "M05 Reaching Roots"),
+          link("https://www.youtube.com/watch?v=5O3BEnN2-BE", "fa-brands fa-youtube", "M14 Seeds of Renewal"),
+          link("https://www.youtube.com/watch?v=tE8gCEMMeg0", "fa-brands fa-youtube", "M15 Biocentric Architecture"),
+          link("https://elearn.robopartans.com/competitions/first-lego-league/2026-bioglow/tips-and-tricks", "fa-lightbulb", "Robopartans tips & tricks")
+        )
+      )
+    );
+  }
+
+  /* ---------- student detail ---------- */
+
+  async function openDetail(username) {
+    state.view = "loading";
+    render();
+    try {
+      const data = await api("user_progress", { query: { username } });
+      state.detail = data;
+      state.view = "detail";
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      if (e.status !== 401) { alert(e.message); state.view = "dash"; render(); }
+    }
+  }
+
+  function viewDetail() {
+    const { user, progress } = state.detail;
+    const missions = (progress && progress.missions) || {};
+    const worked = MISSIONS.filter((m) => missions[m.id] && missions[m.id].status && missions[m.id].status !== "new");
+    return h("div", {},
+      h("button", { class: "fll-link-btn fll-back", type: "button", onclick: () => { state.view = "dash"; render(); } }, icon("fa-arrow-left"), " Back to dashboard"),
+      h("div", { class: "fll-card" },
+        h("h3", {}, icon("fa-user-astronaut"), " ", user.name, user.team ? " · " + user.team : ""),
+        h("p", { class: "fll-muted" }, "Username: ", h("code", {}, user.username), " · Last saved: ", progress.savedAt ? new Date(progress.savedAt * 1000).toLocaleString() : "never")
+      ),
+      worked.length
+        ? worked.map((m) => missionDetail(user, m, missions[m.id]))
+        : h("div", { class: "fll-card fll-muted" }, "This student hasn't started any missions yet.")
+    );
+  }
+
+  function missionDetail(user, m, r) {
+    const [label, cls] = STATUS[r.status] || STATUS.new;
+    const last5 = (r.trials || []).slice(-5);
+    const checks = CHECKLIST.map((c) => c.id).concat(m.noTouch ? ["notouch"] : []);
+    const checked = checks.filter((c) => r.checklist && r.checklist[c]).length;
+    const row = (k, v) => (v === "" || v === null || v === undefined ? null : [h("dt", {}, k), h("dd", {}, v)]);
+    const sketchSlot = h("dd", {});
+    if (r.hasSketch) {
+      sketchSlot.append(h("button", {
+        class: "fll-tool-btn", type: "button",
+        onclick: async (e) => {
+          e.target.disabled = true;
+          try {
+            const data = await api("sketch", { query: { mission: m.id, username: user.username } });
+            sketchSlot.replaceChildren(data.image ? h("img", { src: data.image, alt: user.name + "'s sketch for " + m.name }) : "No sketch saved.");
+          } catch (err) { sketchSlot.textContent = err.message; }
+        }
+      }, icon("fa-image"), " Show sketch"));
+    }
+    return h("div", { class: "coach-mission" },
+      h("h4", {}, m.id + " " + m.name, h("span", { class: "fll-status " + cls }, label), h("span", { class: "fll-muted small" }, "Step " + (r.step || 1) + ": " + STEP_NAMES[r.step || 1])),
+      h("dl", {},
+        row("Moves picked", (r.actions || []).map((a) => (ACTION_BY_ID[a] || {}).label || a).join(", ") + (r.actionsDone ? "  ✓" : "") + (r.actionTries ? "  (" + r.actionTries + " wrong tries)" : "")),
+        row("Touch plan", r.touchPlan),
+        row("Tools picked", (r.tools || []).map((t) => (TOOL_BY_ID[t] || {}).name || t).join(", ")),
+        row("Motor?", r.power === "motor" ? "Uses a motor" : r.power === "passive" ? "No motor" : ""),
+        row("Safe-path plan", r.pathPlan),
+        row("Design", r.design && r.design.desc),
+        row("Parts", r.design && (r.design.parts || []).join(", ")),
+        row("Attaches by", r.design && r.design.connect),
+        r.hasSketch ? [h("dt", {}, "Sketch"), sketchSlot] : null,
+        r.step >= 5 ? row("Checklist", checked + " / " + checks.length + " checked") : null,
+        (r.trials || []).length ? row("Tests", (r.trials || []).length + " runs · last 5: " + last5.filter(Boolean).length + "/" + last5.length + " worked") : null,
+        (r.changes || []).length ? row("Changes", r.changes.map((c) => new Date(c.at).toLocaleDateString() + " – " + c.text).join("\n")) : null
+      )
+    );
+  }
+
+  /* ---------- start ---------- */
+
+  async function init() {
+    render();
+    try {
+      const s = await api("status");
+      if (!s.ready) { state.view = "setup"; return render(); }
+    } catch (e) {
+      state.view = "setup";
+      return render();
+    }
+    try {
+      const me = await fetch("/api/fll?action=me", { credentials: "same-origin" });
+      const data = await me.json();
+      if (me.ok && data.user && data.user.role === "coach") return loadUsers();
+    } catch (e) { /* not logged in */ }
+    state.view = "login";
+    render();
+  }
+
+  init();
+})();
