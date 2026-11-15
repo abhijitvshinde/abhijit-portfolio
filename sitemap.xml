@@ -39,7 +39,13 @@
 
   <url>
     <loc>https://www.abhijitvshinde.com/game.html</loc>
-    <lastmod>2026-10-03</lastmod>
+    <lastmod>2026-11-15</lastmod>
+    <priority>0.4</priority>
+  </url>
+
+  <url>
+    <loc>https://www.abhijitvshinde.com/pybricks/</loc>
+    <lastmod>2026-11-15</lastmod>
     <priority>0.4</priority>
   </url>
 

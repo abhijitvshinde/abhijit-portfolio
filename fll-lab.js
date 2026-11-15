@@ -33,7 +33,8 @@
     });
   });
 
-  show(location.hash === "#fll" ? "fll" : "rov");
+  const start = location.hash.slice(1);
+  show(tabs.some((t) => t.dataset.tab === start) ? start : "rov");
 })();
 
 /* ---------- FLL Attachment Lab ---------- */
