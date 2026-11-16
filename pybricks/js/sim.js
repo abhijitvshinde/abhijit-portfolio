@@ -456,11 +456,40 @@
 
     // ----- missions -----
     inRect(r, x, y) { return x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3]; }
+    stopped() { return Math.abs(this.motors.A.speed) + Math.abs(this.motors.B.speed) < 60; }
+    // how far the robot is from a pose mission's spot: [mm, heading error in degrees or null]
+    poseError(m) {
+      const d = Math.hypot(this.pose.x - m.x, this.pose.y - m.y);
+      if (m.heading === undefined || m.heading === null) return [d, null];
+      let a = (this.pose.yaw / DEG - m.heading) % 360;
+      if (a > 180) a -= 360; if (a < -180) a += 360;
+      return [d, a];
+    }
+    poseOk(m) {
+      const [d, a] = this.poseError(m);
+      return d <= (m.r || 20) && (a === null || Math.abs(a) <= (m.headingTol === undefined ? 3 : m.headingTol));
+    }
     checkMissions(end) {
       for (const m of this.missions) {
         if (m.done) continue;
+        if (m.after && !this.missions.some(x => x.id === m.after && x.done)) continue;
         let ok = false;
         if (m.type === 'zone') ok = this.inRect(m.rect, this.pose.x, this.pose.y);
+        else if (m.type === 'pose') {
+          // end: checked when the program ends; stop: true = robot must pause on the spot during the run
+          if (end || m.stop) ok = this.poseOk(m) && (end || this.stopped());
+        } else if (m.type === 'path') {
+          m.k = m.k || 0;
+          const p = m.pts[m.k];
+          if (p && Math.hypot(this.pose.x - p[0], this.pose.y - p[1]) <= (m.r || 40)) {
+            m.k++;
+            this.events.push({ t: this.t, type: 'checkpoint', id: m.id, k: m.k });
+          }
+          ok = m.k >= m.pts.length;
+        } else if (end && m.type === 'fast') {
+          const others = this.missions.filter(x => x !== m && x.type !== 'clean' && x.type !== 'fast');
+          ok = others.every(x => x.done) && this.endT <= m.time * 1000;
+        }
         else if (m.type === 'touch') {
           const tg = this.targets[m.target];
           if (tg) {
@@ -483,15 +512,35 @@
     }
     finish(reason) {
       this.finishing = true;
+      this.endT = this.t;
       // program ended: Pybricks stops all motors
       this.db && (this.db.mode = 'none');
       for (const p in this.motors) { this.motors[p].mode = 'coast'; this.motors[p].owner = null; }
       for (let i = 0; i < 60; i++) this.tick();
       this.checkMissions(true);
+      this.precisionReport();
       this.pushFrame();
       this.events.push({ t: this.t, type: 'end', reason: reason || 'done', score: this.score, bumps: this.bumpTotal });
       this.flush();
       return { score: this.score, t: this.t };
+    }
+
+    // tell the player how close they got on precision missions
+    precisionReport() {
+      for (const m of this.missions) {
+        if (m.type === 'pose' && !m.stop) {
+          const [d, a] = this.poseError(m);
+          let txt = (m.done ? '🎯 ' : '📍 ') + m.name + ': ' + d.toFixed(1) + ' mm from the spot';
+          if (a !== null) txt += ', ' + Math.abs(a).toFixed(1) + '° ' + (Math.abs(a) < 0.05 ? 'off' : a > 0 ? 'too far left' : 'too far right');
+          txt += ' (allowed: ' + (m.r || 20) + ' mm' + (a !== null ? ', ' + (m.headingTol === undefined ? 3 : m.headingTol) + '°' : '') + ')\n';
+          this.emitPrint(txt, m.done ? 'out' : 'warn');
+        } else if (m.type === 'path' && !m.done) {
+          this.emitPrint('📍 ' + m.name + ': reached ' + (m.k || 0) + ' of ' + m.pts.length + ' checkpoints\n', 'warn');
+        } else if (m.type === 'fast' && !m.done) {
+          const others = this.missions.filter(x => x !== m && x.type !== 'clean' && x.type !== 'fast');
+          if (others.every(x => x.done)) this.emitPrint('⏱ ' + m.name + ': finished in ' + (this.endT / 1000).toFixed(1) + ' s, needed ' + m.time + ' s or less\n', 'warn');
+        }
+      }
     }
 
     // ----- motor API (raw shaft degrees, positive = clockwise) -----

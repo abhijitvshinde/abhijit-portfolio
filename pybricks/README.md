@@ -95,7 +95,13 @@ Map format (all distances in mm, origin at the table's bottom-left corner, y poi
     { id: 'm1', type: 'zone',  rect: [x0, y0, x1, y1], points: 15, name, desc, hint },  // robot centre enters
     { id: 'm2', type: 'touch', target: 'bell', points: 25, name, desc, hint },          // arm tip within r
     { id: 'm3', type: 'park',  rect: [x0, y0, x1, y1], points: 15, name, desc },        // stopped inside at the end
-    { id: 'm4', type: 'clean', minMissions: 3, points: 15, name, desc }                 // no penalty bumps
+    { id: 'm4', type: 'clean', minMissions: 3, points: 15, name, desc },                // no penalty bumps
+    // precision missions (used by the skill challenges):
+    { id: 'p', type: 'pose', x, y, r: 10, heading: 90, headingTol: 2, points, name, desc },  // robot centre within r mm
+    //   (and heading within headingTol deg) when the program ends; stop: true = stopped there at any moment
+    { id: 'k', type: 'path', pts: [[x, y], …], r: 40, points, name, desc },           // checkpoints in order
+    { id: 'f', type: 'fast', time: 20, points, name, desc },                          // all other missions done within `time` s
+    // any mission can have after: 'otherId' so it only counts once that mission is done
   ],
   starter: `python code shown on first load`
 }
@@ -104,6 +110,18 @@ Map format (all distances in mm, origin at the table's bottom-left corner, y poi
 Useful formulas for designing arm missions: tip height = `95 + 150·sin(a)`, tip reach = `55 + 150·cos(a)` mm ahead of
 the wheel axle. Check a new map by writing a solution and running it: every mission should be reachable, and the
 obstacles should block the obvious wrong approach.
+
+## Skill challenges
+
+Besides the big maps there are 25 short challenges, each worth 100 points, grouped in the map picker:
+Beginner B1-B5, Intermediate I1-I7, Advanced A1-A7 and Master M1-M6. They practise exact distances, odd-angle
+turns, reverse parking, arm heights, the colour and ultrasonic sensors, curves and timing. They live in
+`js/maps/challenges-*.js` and use the helpers in `js/maps/challenge-kit.js` (`PYB.challenge()` and `PYB.kit`: gates,
+curved walls, parking slots, arm-angle maths). After a run the console says how close the robot got to every
+precision target.
+
+Reference solutions are in `tools/pybricks-solutions.js` in the website repo. That file is git-ignored and not
+deployed, so kids can't find it. All 25 score 100/100 with both the standard and the team robot setup.
 
 ## Files
 

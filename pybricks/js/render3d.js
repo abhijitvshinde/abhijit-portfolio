@@ -83,7 +83,7 @@ export class World {
     this.map = map;
     this.W = map.size[0]; this.H = map.size[1];
     for (const ch of [...this.mapGroup.children]) { this.mapGroup.remove(ch); ch.traverse?.(o => { o.geometry?.dispose?.(); }); }
-    this.obsMeshes = {}; this.targetMeshes = {}; this.zoneMeshes = {};
+    this.obsMeshes = {}; this.targetMeshes = {}; this.zoneMeshes = {}; this.markers = {};
     const g = this.mapGroup;
 
     // floor under the table
@@ -172,6 +172,39 @@ export class World {
       box.position.copy(this.v((x0 + x1) / 2, (y0 + y1) / 2, 3));
       g.add(box);
       this.zoneMeshes[m.id] = box;
+    }
+
+    // markers for precision missions: a ring (+ arrow for the heading) or numbered checkpoints
+    for (const m of map.missions || []) {
+      if (m.type === 'pose') {
+        const col = m.stop ? '#1f6feb' : '#ff2d7a';
+        const parts = [];
+        const ring = new THREE.Mesh(new THREE.RingGeometry(Math.max(2, (m.r || 20) - 4), (m.r || 20), 48),
+          new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: 0.95 }));
+        ring.rotation.x = -Math.PI / 2; ring.position.copy(this.v(m.x, m.y, 1.5)); g.add(ring); parts.push(ring);
+        const dotM = new THREE.Mesh(new THREE.CircleGeometry(4, 16), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.95 }));
+        dotM.rotation.x = -Math.PI / 2; dotM.position.copy(this.v(m.x, m.y, 1.6)); g.add(dotM); parts.push(dotM);
+        if (m.heading !== undefined && m.heading !== null) {
+          const h = m.heading * DEG, len = Math.max(70, (m.r || 20) + 50);
+          const shaft = new THREE.Mesh(new THREE.PlaneGeometry(len, 5), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: 0.95 }));
+          shaft.rotation.x = -Math.PI / 2; shaft.rotation.z = h;
+          shaft.position.copy(this.v(m.x + Math.cos(h) * len / 2, m.y + Math.sin(h) * len / 2, 1.5)); g.add(shaft); parts.push(shaft);
+          const tip = new THREE.Mesh(new THREE.CircleGeometry(11, 3), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.95 }));
+          tip.rotation.x = -Math.PI / 2; tip.rotation.z = h;
+          tip.position.copy(this.v(m.x + Math.cos(h) * len, m.y + Math.sin(h) * len, 1.6)); g.add(tip); parts.push(tip);
+        }
+        this.markers[m.id] = { parts, col };
+      } else if (m.type === 'path') {
+        const parts = [];
+        m.pts.forEach((p, i) => {
+          const ring = new THREE.Mesh(new THREE.RingGeometry((m.r || 40) - 5, m.r || 40, 40),
+            new THREE.MeshBasicMaterial({ color: '#f59f00', side: THREE.DoubleSide, transparent: true, opacity: 0.95 }));
+          ring.rotation.x = -Math.PI / 2; ring.position.copy(this.v(p[0], p[1], 1.5)); g.add(ring); parts.push(ring);
+          const lb = label(String(i + 1), { size: 24, bg: 'rgba(245,159,0,0.9)' });
+          lb.position.copy(this.v(p[0], p[1], 30)); g.add(lb);
+        });
+        this.markers[m.id] = { parts, col: '#f59f00', path: true };
+      }
     }
 
     this.sun.target.position.set(0, 0, 0);
@@ -318,6 +351,7 @@ export class World {
     this.clearTrail();
     for (const id in this.targetMeshes) this.setTargetDone(id, false);
     for (const id in this.zoneMeshes) this.zoneMeshes[id].material.opacity = 0;
+    for (const id in this.markers) this.markers[id].parts.forEach(p => p.material.color.set(this.markers[id].col));
     this.setHubLight([0, 0, 100]);
     this.setDisplay(null);
   }
@@ -351,6 +385,12 @@ export class World {
     t.ring.material.color.set(done ? '#39d98a' : '#ffb300');
   }
   setZoneDone(id) { const z = this.zoneMeshes[id]; if (z) z.material.opacity = 0.35; }
+  setMarkerDone(id, k) {
+    const mk = this.markers[id];
+    if (!mk) return;
+    const parts = k === undefined ? mk.parts : mk.parts.slice(0, k);
+    parts.forEach(p => p.material.color.set('#2fbf71'));
+  }
   flash(id) {
     const m = this.obsMeshes[id];
     if (!m) return;
@@ -429,8 +469,10 @@ export class World {
     this.camMode = mode;
     this.controls.enabled = mode === 'orbit' || mode === 'top';
     if (mode === 'orbit' && snap) {
-      this.camera.position.set(-150, 1250, 1350);
-      this.controls.target.set(-150, 0, 100);
+      // the standard view, scaled down for smaller tables
+      const k = Math.min(1, Math.max(0.55, this.W / 2360, this.H / 1140));
+      this.camera.position.set(-150 * k, 1250 * k, 1350 * k);
+      this.controls.target.set(-150 * k, 0, 100 * k);
     } else if (mode === 'top') {
       this.camera.position.set(0, Math.max(this.W, this.H) * 1.12, 1);
       this.controls.target.set(0, 0, 0);

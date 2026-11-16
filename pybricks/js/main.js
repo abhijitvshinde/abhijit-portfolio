@@ -170,10 +170,14 @@ function beep(f, d, v) {
 function fillMapSelect() {
   const sel = $('mapSelect');
   sel.innerHTML = '';
+  const groups = {};
   for (const m of PYB.MAPS) {
+    const gname = m.group || 'Maps';
+    if (!groups[gname]) { groups[gname] = document.createElement('optgroup'); groups[gname].label = gname; sel.appendChild(groups[gname]); }
     const o = document.createElement('option');
-    o.value = m.id; o.textContent = `${m.level || ''}. ${m.name} · ${m.difficulty || ''}`;
-    sel.appendChild(o);
+    o.value = m.id;
+    o.textContent = m.code ? `${m.code} · ${m.name}` : `${m.level || ''}. ${m.name} · ${m.difficulty || ''}`;
+    groups[gname].appendChild(o);
   }
 }
 function selectMap(id) {
@@ -312,10 +316,12 @@ function applyEvent(ev) {
       markMission(ev.id);
       if (m && m.target) world.setTargetDone(m.target, true);
       if (m && m.rect) world.setZoneDone(ev.id);
+      if (m && (m.type === 'pose' || m.type === 'path')) world.setMarkerDone(ev.id);
       toast(`✓ ${m ? m.name : ev.id}  +${ev.points}`);
       consoleLine(`✓ Mission complete: ${m ? m.name : ev.id} (+${ev.points})`, 'ok', ev.t);
       break;
     }
+    case 'checkpoint': world.setMarkerDone(ev.id, ev.k); break;
     case 'bump':
       world.flash(ev.id);
       if (ev.penalty) { play.bumps++; toast('Bump: ' + ev.label, true); }

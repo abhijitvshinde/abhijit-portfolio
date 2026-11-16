@@ -1,3 +1,4 @@
 .vercel
 __pycache__/
 tools/.dev-store.json
+tools/pybricks-solutions.js
