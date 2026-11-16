@@ -60,6 +60,9 @@ export class World {
     this.buildTrail();
 
     this.flashes = new Map();
+    this.measureGroup = new THREE.Group();
+    this.scene.add(this.measureGroup);
+    this.raycaster = new THREE.Raycaster();
     const ro = new ResizeObserver(() => this.resize());
     ro.observe(container);
     this.resize();
@@ -370,6 +373,58 @@ export class World {
   }
 
   // ---------- camera ----------
+  // ---------- measuring tools ----------
+  // Screen point -> sim point {x, y, z} on whatever is under the mouse (mat, obstacle top...).
+  // Clicking the robot snaps to the middle of its wheel axle and sets robot: true.
+  pick(clientX, clientY) {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    this.scene.updateMatrixWorld();   // a just-loaded map may not have been rendered yet
+    this.raycaster.setFromCamera(ndc, this.camera);
+    const hits = this.raycaster.intersectObjects([this.robot, this.mapGroup], true);
+    for (const hit of hits) {
+      const o = hit.object;
+      if (o.isSprite || o.isLine || o.isLineSegments) continue;
+      if (o.material && o.material.transparent && o.material.opacity < 0.05) continue;
+      let n = o, onRobot = false;
+      while (n) { if (n === this.robot) { onRobot = true; break; } n = n.parent; }
+      if (onRobot && this.pose) return { x: this.pose.x, y: this.pose.y, z: 0, robot: true };
+      const p = hit.point;
+      return { x: p.x + this.W / 2, y: this.H / 2 - p.z, z: Math.max(0, p.y) };
+    }
+    return null;
+  }
+
+  // Draw a measurement: pts are sim points, segs pairs of indexes, text the label near `at`.
+  // dashed: extra [from, to] sim points drawn as a dashed guide (e.g. the robot's heading).
+  setMeasure(m) {
+    const g = this.measureGroup;
+    g.children.slice().forEach(c => { g.remove(c); if (c.geometry) c.geometry.dispose(); if (c.material) { if (c.material.map) c.material.map.dispose(); c.material.dispose(); } });
+    if (!m) return;
+    const lift = (p) => this.v(p.x, p.y, (p.z || 0) + 3);
+    const col = '#ff2d7a';
+    for (const p of m.pts) {
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(9, 16, 12), new THREE.MeshBasicMaterial({ color: col, depthTest: false }));
+      dot.position.copy(lift(p)); dot.renderOrder = 11; g.add(dot);
+    }
+    const line = (a, b, dashed, color) => {
+      const geom = new THREE.BufferGeometry().setFromPoints([lift(a), lift(b)]);
+      const mat = dashed
+        ? new THREE.LineDashedMaterial({ color: color || col, dashSize: 18, gapSize: 12, depthTest: false })
+        : new THREE.LineBasicMaterial({ color: color || col, depthTest: false });
+      const l = new THREE.Line(geom, mat);
+      if (dashed) l.computeLineDistances();
+      l.renderOrder = 11; g.add(l);
+    };
+    for (const [i, j] of m.segs || []) line(m.pts[i], m.pts[j], false);
+    for (const [a, b] of m.dashed || []) line(a, b, true, '#1f6feb');
+    if (m.text && m.at) {
+      const sp = label(m.text, { bg: 'rgba(255,45,122,0.92)', size: 30 });
+      sp.position.copy(this.v(m.at.x, m.at.y, (m.at.z || 0) + 45));
+      sp.renderOrder = 12; g.add(sp);
+    }
+  }
+
   setCamera(mode, snap) {
     this.camMode = mode;
     this.controls.enabled = mode === 'orbit' || mode === 'top';

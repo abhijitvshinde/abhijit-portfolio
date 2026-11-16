@@ -255,3 +255,18 @@ dialog.ref::backdrop { background: rgba(10, 14, 20, .5); }
 .save-state.ok { color: var(--good); }
 .save-state.bad { color: var(--bad); }
 .menu[hidden], #userBtn[hidden], #setupLogin[hidden], #coachLink[hidden] { display: none; }
+
+/* ---- measuring tools ---- */
+.tools { position: absolute; right: 10px; top: 48px; display: flex; gap: 2px; background: rgba(14,19,28,.72); border-radius: 9px; padding: 3px; }
+.tools button { border: none; background: none; color: #cfd8e3; padding: 5px 10px; border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 12.5px; }
+.tools button.on { background: #ff2d7a; color: #fff; }
+.view.measuring canvas { cursor: crosshair; }
+.measure-box { position: absolute; right: 10px; top: 86px; width: min(280px, calc(100% - 20px)); background: rgba(14,19,28,.86); color: #e8eef5; border-radius: 10px; padding: 9px 12px; font-size: 13px; line-height: 1.4; }
+.measure-box[hidden] { display: none; }
+.measure-box { font-size: 12.5px; }
+.mb-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.mb-head button { background: none; border: none; color: #cfd8e3; cursor: pointer; font-size: 14px; padding: 0 2px; }
+.mb-main { font-size: 19px; font-weight: 800; color: #ff7aa8; margin: 2px 0; }
+.mb-main:empty { display: none; }
+.mb-info { color: #c3cfdc; }
+

@@ -84,6 +84,15 @@
           <button data-cam="follow">Follow</button>
           <button data-cam="side">Side</button>
         </div>
+        <div class="tools" role="group" aria-label="Measuring tools">
+          <button data-tool="distance" title="Measure a distance: click two points">📏 Distance</button>
+          <button data-tool="angle" title="Measure an angle: click the corner, then the two lines">📐 Angle</button>
+        </div>
+        <div id="measureBox" class="measure-box" hidden aria-live="polite">
+          <div class="mb-head"><b id="mbTitle"></b><button type="button" id="mbClose" aria-label="Close measuring tool">✕</button></div>
+          <div id="mbMain" class="mb-main"></div>
+          <div id="mbInfo" class="mb-info"></div>
+        </div>
         <div class="hubw" title="Hub light matrix">
           <div id="hubMatrix" class="matrix"></div>
           <div id="hubLabel" class="mlabel"></div>

@@ -189,6 +189,7 @@ function selectMap(id) {
   loadingCode = false;
   editor.clearHistory();
   world.loadMap(map);
+  if (measure.tool) { measure.pts = []; measure.hover = null; drawMeasure(); }
   resetPlayback();
   renderMissions();
   renderRobotTab();
@@ -609,6 +610,108 @@ $('setupForm').onsubmit = (e) => {
   $('setupDialog').close();
   applyRobotSetup(s);
 };
+// ---------- measuring tools ----------
+const measure = { tool: null, pts: [], hover: null };
+const MEASURE_NEEDS = { distance: 2, angle: 3 };
+const r0 = (n) => Math.round(n);
+const normDeg = (a) => { a = ((a + 180) % 360 + 360) % 360 - 180; return a === -180 ? 180 : a; };
+function measureNeeds() {
+  if (measure.tool === 'angle' && measure.pts[0] && measure.pts[0].robot) return 2;
+  return MEASURE_NEEDS[measure.tool] || 0;
+}
+function measureDone() { return measure.pts.length >= measureNeeds(); }
+function setTool(tool) {
+  measure.tool = measure.tool === tool ? null : tool;
+  measure.pts = []; measure.hover = null;
+  document.querySelectorAll('.tools button').forEach(b => b.classList.toggle('on', b.dataset.tool === measure.tool));
+  $('view').classList.toggle('measuring', !!measure.tool);
+  drawMeasure();
+}
+function drawMeasure() {
+  const box = $('measureBox');
+  if (!measure.tool) { box.hidden = true; world.setMeasure(null); return; }
+  box.hidden = false;
+  const done = measureDone();
+  const pts = done || !measure.hover ? measure.pts.slice() : measure.pts.concat([measure.hover]);
+  let main = '', info = '', draw = { pts, segs: [] };
+  if (measure.tool === 'distance') {
+    $('mbTitle').textContent = '📏 Distance';
+    if (pts.length >= 2) {
+      const [a, b] = pts;
+      const dx = b.x - a.x, dy = b.y - a.y, dz = (b.z || 0) - (a.z || 0), flat = Math.hypot(dx, dy);
+      main = r0(flat) + ' mm';
+      draw.segs = [[0, 1]];
+      draw.text = main; draw.at = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: Math.max(a.z || 0, b.z || 0) };
+      if (a.robot) {
+        const yaw = world.pose ? world.pose.yaw : 0;
+        const ahead = dx * Math.cos(yaw) + dy * Math.sin(yaw), side = -dx * Math.sin(yaw) + dy * Math.cos(yaw);
+        info = `From the robot's wheels: ${r0(Math.abs(ahead))} mm ${ahead >= 0 ? 'ahead' : 'behind'}, ${r0(Math.abs(side))} mm to the ${side >= 0 ? 'left' : 'right'}.`;
+      } else {
+        info = `Across (x): ${r0(Math.abs(dx))} mm · up the mat (y): ${r0(Math.abs(dy))} mm.`;
+      }
+      if (Math.abs(dz) > 4) info += ` Height: ${r0(a.z || 0)} → ${r0(b.z || 0)} mm (${dz > 0 ? '+' : '−'}${r0(Math.abs(dz))} mm).`;
+    }
+    if (!pts.length) info = 'Click the start point. Tip: click the robot to measure from its wheels.';
+    else if (!done) info = (pts.length >= 2 ? info + ' ' : '') + 'Click the end point.';
+    else info += ' Click again for a new one.';
+  } else {
+    $('mbTitle').textContent = '📐 Angle';
+    const c = pts[0];
+    if (c && c.robot) {
+      const yaw = world.pose ? world.pose.yaw : 0;
+      const far = { x: c.x + Math.cos(yaw) * 350, y: c.y + Math.sin(yaw) * 350, z: 0 };
+      draw.dashed = [[c, far]];
+      if (pts.length >= 2) {
+        const p = pts[1];
+        const bearing = Math.atan2(p.y - c.y, p.x - c.x) / DEG;
+        const turn = normDeg(yaw / DEG - bearing);   // clockwise positive, like Pybricks
+        main = `${r0(Math.abs(turn))}° ${Math.abs(turn) < 0.5 ? '' : turn > 0 ? 'right' : 'left'}`.trim();
+        draw.segs = [[0, 1]]; draw.text = main; draw.at = p;
+        info = Math.abs(turn) < 0.5 ? 'The robot is already facing this point.'
+          : `Turn ${r0(Math.abs(turn))}° ${turn > 0 ? 'clockwise (right) to face it: a positive' : 'counterclockwise (left) to face it: a negative'} turn angle in Pybricks.`;
+        info += ` It is ${r0(Math.hypot(p.x - c.x, p.y - c.y))} mm away.`;
+      } else info = 'The dashed blue line is the way the robot faces. Click the point you want it to face.';
+    } else if (pts.length >= 3) {
+      const [a, b, cc] = pts;
+      const ab = Math.atan2(b.y - a.y, b.x - a.x) / DEG, ac = Math.atan2(cc.y - a.y, cc.x - a.x) / DEG;
+      const turn = normDeg(ab - ac);   // clockwise positive
+      main = `${r0(Math.abs(turn))}°`;
+      draw.segs = [[0, 1], [0, 2]]; draw.text = main; draw.at = a;
+      info = `Going from the first line to the second is a ${turn >= 0 ? 'clockwise (right)' : 'counterclockwise (left)'} turn.`;
+    } else if (pts.length === 2) {
+      draw.segs = [[0, 1]];
+      info = 'Click a point on the second line.';
+    } else if (pts.length === 1) info = 'Click a point on the first line.';
+    else info = 'Click the corner of the angle. Tip: click the robot to measure from the way it is facing.';
+    if (done) info += ' Click again for a new one.';
+  }
+  $('mbMain').textContent = main;
+  $('mbInfo').textContent = info;
+  world.setMeasure(pts.length ? draw : null);
+}
+{
+  const cv = world.renderer.domElement;
+  let down = null, hoverQueued = false;
+  cv.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
+  cv.addEventListener('pointerup', (e) => {
+    if (!measure.tool || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return;
+    const p = world.pick(e.clientX, e.clientY);
+    if (!p) return;
+    if (measureDone()) measure.pts = [];
+    measure.pts.push(p);
+    drawMeasure();
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (!measure.tool || measureDone() || !measure.pts.length || hoverQueued) return;
+    hoverQueued = true;
+    requestAnimationFrame(() => { hoverQueued = false; measure.hover = world.pick(e.clientX, e.clientY); drawMeasure(); });
+  });
+  cv.addEventListener('pointerleave', () => { if (measure.hover) { measure.hover = null; drawMeasure(); } });
+}
+document.querySelectorAll('.tools button').forEach(b => (b.onclick = () => setTool(b.dataset.tool)));
+$('mbClose').onclick = () => setTool(null);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && measure.tool && !document.querySelector('dialog[open]')) setTool(null); });
+
 // ---------- login ----------
 function toastMsg(text) { toast(text, /not saved|could not/i.test(text)); }
 function renderUser() {
@@ -681,4 +784,4 @@ selectMap(PYB.MAPS.some(m => m.id === startId) ? startId : PYB.MAPS[0].id);
 requestAnimationFrame(loop);
 if (store.get('pyb-setup-ask') !== '0') openSetup();
 // debugging hook (also lets tests advance the replay while the tab is hidden)
-window.__pyb = { world, play, editor, run, applyRobotSetup, openSetup, account, step: (ms) => { lastNow = performance.now() - ms; loop(performance.now(), true); } };
+window.__pyb = { world, play, editor, run, applyRobotSetup, openSetup, account, measure, drawMeasure, setTool, step: (ms) => { lastNow = performance.now() - ms; loop(performance.now(), true); } };
