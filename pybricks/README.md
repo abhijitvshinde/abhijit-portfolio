@@ -34,6 +34,14 @@ start with. A player's own choice ("Make this my default robot") is saved in the
 `DEFAULT_SETUP`. Map starter programs are written for the standard robot and are rewritten automatically for
 the chosen setup.
 
+### Logins
+
+Students log in with the **same accounts as the FLL Attachment Lab** (created on `/fll-coach.html`, stored by
+`api/fll.py`). Logged in, their program for each map, their robot setup and their best score per map are saved
+to the account (`robot:<user>` and `robotscore:<user>` in Redis); the coach dashboard shows the scores and the
+programs. Without a login, or on a copy of the site without the API, everything works as a guest and is saved
+in the browser only. Client code: `js/account.js`.
+
 Rules the sim enforces:
 
 - The body collides with anything lower than 95 mm. The arm collides with anything in its path, including

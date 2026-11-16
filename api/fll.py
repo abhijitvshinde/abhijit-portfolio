@@ -4,6 +4,7 @@ FLL Attachment Lab API (Vercel Python serverless function).
 One endpoint, routed by ?action=...
   Public : status, login, logout, me
   Kid    : progress (GET/POST), sketch (GET/POST)
+           robot (GET/POST), robot_score (POST)   <- Pybricks Robot Lab (/pybricks/), same accounts
   Coach  : users, create_user, reset_password, delete_user, user_progress, sketch?username=
 
 Required environment variables (set in Vercel -> Project -> Settings -> Environment Variables):
@@ -39,6 +40,13 @@ PBKDF2_ROUNDS = 210_000
 MAX_PROGRESS_BYTES = 60_000
 MAX_SKETCH_BYTES = 250_000
 MISSION_RE = re.compile(r"^M(0[1-9]|1[0-5])$")
+MAP_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
+MAX_ROBOT_CODE = 40_000      # characters per map program
+MAX_ROBOT_BYTES = 200_000    # whole Robot Lab save (all maps)
+ROBOT_SETUP_KEYS = {
+    "left": "port", "right": "port", "arm": "port",
+    "color": "sensor", "ultrasonic": "sensor", "force": "sensor",
+}
 USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{2,23}$")
 
 
@@ -329,6 +337,9 @@ class handler(BaseHTTPRequestHandler):
                 ("POST", "reset_password"): self.reset_password,
                 ("POST", "delete_user"): self.delete_user,
                 ("GET", "user_progress"): self.user_progress,
+                ("GET", "robot"): self.get_robot,
+                ("POST", "robot"): self.save_robot,
+                ("POST", "robot_score"): self.save_robot_score,
             }
             fn = routes.get((method, action))
             if not fn:
@@ -478,6 +489,95 @@ class handler(BaseHTTPRequestHandler):
         self.store.cmd("SET", PREFIX + f"sketch:{sess['u']}:{mission}", image)
         self._send(200, {"ok": True})
 
+    # --- Pybricks Robot Lab (kid)
+
+    def _map_id(self, value):
+        if not isinstance(value, str) or not MAP_ID_RE.match(value):
+            raise ApiError(400, "Unknown map.")
+        return value
+
+    def _clean_setup(self, raw):
+        if not isinstance(raw, dict):
+            raise ApiError(400, "Bad robot setup.")
+        out = {}
+        for key, kind in ROBOT_SETUP_KEYS.items():
+            v = raw.get(key)
+            ok = isinstance(v, str) and (v in "ABCDEF" and len(v) == 1 or (kind == "sensor" and v == "none"))
+            if not ok:
+                raise ApiError(400, "Bad robot setup.")
+            out[key] = v
+        out["mirrored"] = "right" if raw.get("mirrored") == "right" else "left"
+        out["armUp"] = -1 if raw.get("armUp") == -1 else 1
+        try:
+            out["wheel"] = float(raw.get("wheel"))
+            out["track"] = float(raw.get("track"))
+        except (TypeError, ValueError):
+            raise ApiError(400, "Bad robot setup.")
+        if not (20 <= out["wheel"] <= 150 and 60 <= out["track"] <= 250):
+            raise ApiError(400, "Bad robot setup.")
+        return out
+
+    def get_robot(self):
+        sess, _ = self._require("kid")
+        self._send(200, {
+            "robot": self._get_json("robot:" + sess["u"]) or {},
+            "scores": self._get_json("robotscore:" + sess["u"]) or {},
+        })
+
+    def save_robot(self):
+        """Save the robot setup and/or one map's program: {setup?, mapId?, code?}."""
+        sess, _ = self._require("kid")
+        doc = self._get_json("robot:" + sess["u"]) or {}
+        if "setup" in self.body:
+            doc["setup"] = self._clean_setup(self.body.get("setup"))
+        if "mapId" in self.body:
+            map_id = self._map_id(self.body.get("mapId"))
+            code = self.body.get("code")
+            if not isinstance(code, str):
+                raise ApiError(400, "Bad program.")
+            if len(code) > MAX_ROBOT_CODE:
+                raise ApiError(413, "That program is too long to save.")
+            doc.setdefault("code", {})[map_id] = code
+        doc["savedAt"] = int(time.time())
+        if len(json.dumps(doc)) > MAX_ROBOT_BYTES:
+            raise ApiError(413, "Your programs are too long to save. Make some shorter.")
+        self._set_json("robot:" + sess["u"], doc)
+        self.store.cmd("SET", PREFIX + "seen:" + sess["u"], str(int(time.time())))
+        self._send(200, {"ok": True, "savedAt": doc["savedAt"]})
+
+    def save_robot_score(self):
+        """Record one finished run: {mapId, mapName, score, total, missions: [ids]}. Keeps the best."""
+        sess, _ = self._require("kid")
+        map_id = self._map_id(self.body.get("mapId"))
+        try:
+            score = int(self.body.get("score"))
+            total = int(self.body.get("total"))
+        except (TypeError, ValueError):
+            raise ApiError(400, "Bad score.")
+        if not (0 <= score <= total <= 1000):
+            raise ApiError(400, "Bad score.")
+        missions = self.body.get("missions") or []
+        if not isinstance(missions, list):
+            raise ApiError(400, "Bad score.")
+        missions = [clean_text(m, 24) for m in missions[:20] if isinstance(m, str)]
+        scores = self._get_json("robotscore:" + sess["u"]) or {}
+        rec = scores.get(map_id) or {"best": 0, "runs": 0}
+        now = int(time.time())
+        rec["runs"] = int(rec.get("runs", 0)) + 1
+        rec["last"] = score
+        rec["lastAt"] = now
+        rec["total"] = total
+        rec["name"] = clean_text(self.body.get("mapName"), 40) or map_id
+        if score >= int(rec.get("best", 0)):
+            if score > int(rec.get("best", 0)) or not rec.get("bestAt"):
+                rec["bestAt"] = now
+            rec["best"] = score
+            rec["missions"] = missions
+        scores[map_id] = rec
+        self._set_json("robotscore:" + sess["u"], scores)
+        self.store.cmd("SET", PREFIX + "seen:" + sess["u"], str(now))
+        self._send(200, {"ok": True, "best": rec["best"]})
+
     # --- coach
 
     def list_users(self):
@@ -487,10 +587,11 @@ class handler(BaseHTTPRequestHandler):
         if names:
             keys = []
             for n in names:
-                keys += [PREFIX + "user:" + n, PREFIX + "progress:" + n, PREFIX + "seen:" + n]
+                keys += [PREFIX + "user:" + n, PREFIX + "progress:" + n, PREFIX + "seen:" + n,
+                         PREFIX + "robotscore:" + n]
             raw = self.store.cmd("MGET", *keys)
             for i, n in enumerate(names):
-                user_raw, prog_raw, seen = raw[3 * i: 3 * i + 3]
+                user_raw, prog_raw, seen, robot_raw = raw[4 * i: 4 * i + 4]
                 if not user_raw:
                     continue
                 user = json.loads(user_raw)
@@ -506,6 +607,7 @@ class handler(BaseHTTPRequestHandler):
                         for mid, m in (prog.get("missions") or {}).items()
                         if isinstance(m, dict)
                     },
+                    "robot": json.loads(robot_raw) if robot_raw else {},
                 })
         self._send(200, {"users": users})
 
@@ -558,7 +660,7 @@ class handler(BaseHTTPRequestHandler):
         self._require("coach")
         user = self._target_user()
         u = user["username"]
-        keys = [PREFIX + k for k in (f"user:{u}", f"progress:{u}", f"seen:{u}")]
+        keys = [PREFIX + k for k in (f"user:{u}", f"progress:{u}", f"seen:{u}", f"robot:{u}", f"robotscore:{u}")]
         keys += [PREFIX + f"sketch:{u}:M{i:02d}" for i in range(1, 16)]
         self.store.pipeline([["DEL", *keys], ["SREM", PREFIX + "users", u]])
         self._send(200, {"ok": True})
@@ -567,4 +669,8 @@ class handler(BaseHTTPRequestHandler):
         self._require("coach")
         user = self._target_user()
         progress = self._get_json("progress:" + user["username"]) or {}
-        self._send(200, {"user": self._public_user(user), "progress": progress})
+        self._send(200, {
+            "user": self._public_user(user), "progress": progress,
+            "robot": self._get_json("robot:" + user["username"]) or {},
+            "robotScores": self._get_json("robotscore:" + user["username"]) or {},
+        })

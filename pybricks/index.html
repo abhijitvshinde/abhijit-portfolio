@@ -37,6 +37,12 @@
       </label>
     </div>
     <div class="actions right">
+      <button id="userBtn" class="btn ghost" hidden title="Log in with the username your coach gave you">👤 <span id="userName">Log in</span></button>
+      <div id="userMenu" class="menu user-menu" hidden>
+        <div class="menu-note" id="userMenuNote"></div>
+        <a id="coachLink" href="../fll-coach.html" hidden>Open coach dashboard</a>
+        <button data-act="logout">Log out</button>
+      </div>
       <button id="setupBtn" class="btn ghost" title="Choose which port each motor and sensor is on">🤖 <span id="setupName">Robot setup</span></button>
       <button id="refBtn" class="btn ghost">📖 Pybricks reference</button>
       <button id="moreBtn" class="btn ghost" aria-haspopup="true">⋯</button>
@@ -52,7 +58,7 @@
   <main class="layout">
     <section class="pane code-pane">
       <div class="pane-head">
-        <span>main.py</span>
+        <span>main.py <span id="saveState" class="save-state"></span></span>
         <span id="status" class="status">Starting…</span>
       </div>
       <div class="editor"><textarea id="code"></textarea></div>
@@ -106,7 +112,8 @@
         <h2 id="setupTitle">Robot setup</h2>
         <button type="button" class="btn ghost" id="setupClose" aria-label="Close">✕</button>
       </div>
-      <p class="setup-intro">Pick the robot you are programming. Match your real robot and the same program runs here and on the table.</p>
+      <p class="setup-intro">Pick the robot you are programming. Match your real robot and the same program runs here and on the table.
+        <span id="setupLogin" hidden>Got a login from your coach? <button type="button" class="link-btn" id="setupLoginBtn">Log in</button> to save your work.</span></p>
       <div class="presets" id="setupPresets" role="radiogroup" aria-label="Robot"></div>
       <details class="setup-more" id="setupMore">
         <summary>Ports and wheels</summary>
@@ -119,6 +126,23 @@
       <label class="check"><input type="checkbox" id="setupAsk"> Show this screen when the Robot Lab opens</label>
       <div class="setup-foot">
         <button type="submit" class="btn primary" id="setupOk">Use this robot</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="loginDialog" class="setup login" aria-labelledby="loginTitle">
+    <form id="loginForm">
+      <div class="setup-head">
+        <h2 id="loginTitle">Log in</h2>
+        <button type="button" class="btn ghost" id="loginClose" aria-label="Close">✕</button>
+      </div>
+      <p class="setup-intro">Use the username and password from your coach (the same one as the FLL Attachment Lab). Your programs, robot setup and best scores are saved to your login.</p>
+      <label class="field">Username<input id="loginUser" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+      <label class="field">Password<input id="loginPass" type="password" autocomplete="current-password" required></label>
+      <p class="setup-err" id="loginErr" hidden></p>
+      <div class="setup-foot">
+        <button type="button" class="btn" id="loginGuest">Play as guest</button>
+        <button type="submit" class="btn primary" id="loginOk">Log in</button>
       </div>
     </form>
   </dialog>

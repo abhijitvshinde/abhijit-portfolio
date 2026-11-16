@@ -915,3 +915,7 @@ button.fll-btn-good{ border:0; }
 @media (prefers-reduced-motion: reduce){
   .fll-mission-card, .fll-ready-star, .fll-bar-fill{ transition:none; animation:none; }
 }
+
+/* coach page: Robot Lab programs */
+.coach-code { margin: 8px 0 0; padding: 10px 12px; border-radius: 8px; background: #121722; color: #d6e2f0; font: 12.5px/1.5 ui-monospace, Consolas, monospace; overflow: auto; max-height: 420px; white-space: pre; }
+details.coach-mission summary { cursor: pointer; }

@@ -180,6 +180,7 @@
             shown.length ? matrix(shown) : h("p", { class: "fll-muted" }, "No students yet. Add your first student on the left.")
           ),
           shown.length ? h("div", { class: "fll-card" }, h("h3", {}, icon("fa-users"), " Students"), studentTable(shown)) : null,
+          shown.length ? robotLabTable(shown) : null,
           resources()
         )
       )
@@ -401,6 +402,58 @@
     );
   }
 
+  /* ---------- Pybricks Robot Lab (same logins) ---------- */
+
+  function robotMaps(users) {
+    const maps = {};
+    users.forEach((u) => Object.entries(u.robot || {}).forEach(([id, r]) => { if (!maps[id]) maps[id] = r.name || id; }));
+    return Object.entries(maps).sort((a, b) => a[0].localeCompare(b[0]));
+  }
+
+  function robotLabTable(users) {
+    const maps = robotMaps(users);
+    return h("div", { class: "fll-card" },
+      h("h3", {}, icon("fa-robot"), " Pybricks Robot Lab"),
+      h("p", { class: "fll-muted small" }, "Students log in to ", h("a", { href: "/pybricks/", target: "_blank", rel: "noopener" }, "the Robot Lab"),
+        " with the same username and password. Best score per map (number of runs in brackets). Open a student to read their programs."),
+      maps.length
+        ? h("div", { class: "coach-table-wrap" },
+          h("table", { class: "coach-table" },
+            h("thead", {}, h("tr", {}, h("th", {}, "Student"), maps.map(([id, name]) => h("th", {}, name)))),
+            h("tbody", {}, users.map((u) => h("tr", {},
+              h("td", {}, h("button", { class: "fll-link-btn", type: "button", onclick: () => openDetail(u.username) }, u.name)),
+              maps.map(([id]) => {
+                const r = (u.robot || {})[id];
+                return h("td", {}, r ? r.best + " / " + r.total + " (" + r.runs + ")" : "—");
+              })
+            )))
+          ))
+        : h("p", { class: "fll-muted" }, "No Robot Lab runs yet.")
+    );
+  }
+
+  function robotDetail(robot, scores) {
+    const code = (robot && robot.code) || {};
+    const ids = [...new Set(Object.keys(scores || {}).concat(Object.keys(code)))].sort();
+    const st = robot && robot.setup;
+    return h("div", { class: "fll-card" },
+      h("h3", {}, icon("fa-robot"), " Pybricks Robot Lab"),
+      st ? h("p", { class: "fll-muted small" }, "Robot: drive motors on ", st.left, " (left) and ", st.right, " (right), arm on ", st.arm,
+        ", ", String(st.wheel), " mm wheels, ", String(st.track), " mm axle track.") : null,
+      ids.length
+        ? ids.map((id) => {
+          const r = (scores || {})[id];
+          return h("details", { class: "coach-mission" },
+            h("summary", {}, h("strong", {}, (r && r.name) || id), " · ",
+              r ? "best " + r.best + " / " + r.total + ", " + r.runs + " run" + (r.runs === 1 ? "" : "s") + ", last " + r.last
+                + (r.lastAt ? " (" + ago(r.lastAt) + ")" : "") : "no runs yet"),
+            code[id] ? h("pre", { class: "coach-code" }, code[id]) : h("p", { class: "fll-muted" }, "No saved program.")
+          );
+        })
+        : h("p", { class: "fll-muted" }, "This student hasn't used the Robot Lab yet.")
+    );
+  }
+
   async function resetPassword(u) {
     const pw = prompt("New password for " + u.name + " (6+ characters):", makePassword());
     if (pw === null) return;
@@ -472,7 +525,7 @@
   }
 
   function viewDetail() {
-    const { user, progress } = state.detail;
+    const { user, progress, robot, robotScores } = state.detail;
     const missions = (progress && progress.missions) || {};
     const worked = MISSIONS.filter((m) => missions[m.id] && missions[m.id].status && missions[m.id].status !== "new");
     return h("div", {},
@@ -483,7 +536,8 @@
       ),
       worked.length
         ? worked.map((m) => missionDetail(user, m, missions[m.id]))
-        : h("div", { class: "fll-card fll-muted" }, "This student hasn't started any missions yet.")
+        : h("div", { class: "fll-card fll-muted" }, "This student hasn't started any missions yet."),
+      robotDetail(robot, robotScores)
     );
   }
 

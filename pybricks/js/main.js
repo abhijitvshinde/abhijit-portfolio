@@ -1,6 +1,7 @@
 // Page logic: editor, worker, replay of simulation frames, missions UI.
 import { World } from './render3d.js';
 import { REFERENCE } from './reference.js';
+import { account } from './account.js';
 
 const PYB = window.PYB;
 const R = PYB.ROBOT;
@@ -35,10 +36,37 @@ const editor = CodeMirror.fromTextArea($('code'), {
   }
 });
 let errLine = null;
+let loadingCode = false;   // true while a saved program is being put into the editor
 editor.on('change', () => {
   if (errLine !== null) { editor.removeLineClass(errLine, 'background', 'err-line'); errLine = null; }
-  if (map) store.set('pyb-code-' + map.id, editor.getValue());
+  if (!map || loadingCode) return;
+  if (account.kid) queueCloudSave();
+  else store.set('pyb-code-' + map.id, editor.getValue());
 });
+
+// ---------- saving to the kid's login ----------
+let saveTimer = null, saveMap = null;
+function saveState(text, cls) { const el = $('saveState'); el.textContent = text; el.className = 'save-state ' + (cls || ''); }
+function queueCloudSave() {
+  if (saveTimer && saveMap !== map.id) flushCloudSave();
+  saveMap = map.id;
+  saveState('· saving…');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushCloudSave, 1500);
+}
+async function flushCloudSave() {
+  clearTimeout(saveTimer); saveTimer = null;
+  const id = saveMap; saveMap = null;
+  if (!id || !account.kid) return;
+  const code = id === (map && map.id) ? editor.getValue() : account.code(id);
+  try {
+    await account.saveCode(id, code);
+    if (!saveTimer) saveState('· saved ✓', 'ok');
+  } catch (e) {
+    saveState('· not saved: ' + e.message, 'bad');
+  }
+}
+window.addEventListener('pagehide', () => { if (saveTimer) flushCloudSave(); });
 
 // ---------- 3D world ----------
 const world = new World($('view'));
@@ -154,8 +182,11 @@ function selectMap(id) {
   $('mapSelect').value = map.id;
   store.set('pyb-map', map.id);
   if (location.hash !== '#' + map.id) history.replaceState(null, '', '#' + map.id);
-  const saved = store.get('pyb-code-' + map.id);
+  if (saveTimer) flushCloudSave();
+  const saved = account.kid ? account.code(map.id) : store.get('pyb-code-' + map.id);
+  loadingCode = true;
   editor.setValue(!saved || isStarterCode(saved) ? starterCode() : saved);
+  loadingCode = false;
   editor.clearHistory();
   world.loadMap(map);
   resetPlayback();
@@ -345,13 +376,20 @@ function showResults() {
   $('replayBtn').onclick = replay;
   const best = +(store.get('pyb-best-' + map.id) || 0);
   if (play.score > best) store.set('pyb-best-' + map.id, String(play.score));
+  if (account.kid && !play.reported) {
+    play.reported = true;
+    const prevBest = (account.scores[map.id] || {}).best || 0;
+    account.saveScore({ mapId: map.id, mapName: map.name, score: play.score, total, missions: [...play.done] })
+      .then(d => { if (play.score > prevBest && play.score === d.best) toastMsg('New best on ' + map.name + ': ' + d.best + ' points!'); })
+      .catch(err => toastMsg('Score not saved: ' + err.message));
+  }
 }
 function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
 function replay() {
   const frames = play.frames, events = play.events.filter(e => e.type !== 'print' && e.type !== 'error');
   resetPlayback();
-  Object.assign(play, { frames, events, workerDone: true, active: true });
+  Object.assign(play, { frames, events, workerDone: true, active: true, reported: true });
 }
 
 let lastNow = performance.now();
@@ -462,6 +500,7 @@ function readSetup(key) {
   try { const j = store.get(key); return j ? PYB.cleanSetup(JSON.parse(j)) : null; } catch (e) { return null; }
 }
 function defaultSetup() {
+  if (account.kid && account.robot.setup) return PYB.cleanSetup(account.robot.setup);
   return readSetup('pyb-setup-default') || PYB.cleanSetup(PYB.SETUP_PRESETS[PYB.DEFAULT_SETUP] || PYB.SETUP_PRESETS.lab);
 }
 function setupLabel(s) {
@@ -561,11 +600,80 @@ $('setupForm').onsubmit = (e) => {
   if (setupError(draft)) return;
   const s = PYB.cleanSetup(draft);
   if (!presetList().some(o => sameSetup(o.s, s))) store.set('pyb-setup-custom', JSON.stringify(s));
-  if ($('setupDefault').checked) store.set('pyb-setup-default', JSON.stringify(s));
+  if (account.kid) {
+    if ($('setupDefault').checked && !sameSetup(defaultSetup(), s)) {
+      account.saveSetup(s).then(() => toastMsg('Robot saved to your login')).catch(err => toastMsg('Could not save the robot: ' + err.message));
+    }
+  } else if ($('setupDefault').checked) store.set('pyb-setup-default', JSON.stringify(s));
   else if (sameSetup(readSetup('pyb-setup-default'), s)) { try { localStorage.removeItem('pyb-setup-default'); } catch (err) { /* ignore */ } }
   $('setupDialog').close();
   applyRobotSetup(s);
 };
+// ---------- login ----------
+function toastMsg(text) { toast(text, /not saved|could not/i.test(text)); }
+function renderUser() {
+  $('userBtn').hidden = !account.available;
+  $('setupLogin').hidden = !account.available || !!account.user;
+  const u = account.user;
+  $('userName').textContent = u ? (u.role === 'coach' ? 'Coach' : u.name) : 'Log in';
+  $('coachLink').hidden = !(u && u.role === 'coach');
+  $('userMenuNote').textContent = !u ? '' : u.role === 'coach'
+    ? 'Coach accounts play as a guest here, so nothing is saved. Students\' Robot Lab scores and programs are on the coach dashboard.'
+    : 'Logged in as ' + u.username + (u.team ? ' · ' + u.team : '') + '. Your programs, robot and best scores are saved.';
+  saveState(account.kid ? '· saved to your login' : '', account.kid ? 'ok' : '');
+}
+// after logging in or out: switch robot and programs to the right owner
+function switchOwner(carryCode) {
+  applyRobotSetup(defaultSetup());
+  const id = map.id;
+  if (account.kid && carryCode && !account.code(id) && !isStarterCode(carryCode)) {
+    // keep what the kid typed as a guest
+    account.saveCode(id, carryCode).catch(() => {});
+  }
+  selectMap(id);
+  renderUser();
+}
+function openLogin() {
+  $('loginErr').hidden = true;
+  $('loginPass').value = '';
+  if ($('setupDialog').open) $('setupDialog').close();
+  $('loginDialog').showModal();
+  $('loginUser').focus();
+}
+$('userBtn').onclick = (e) => {
+  e.stopPropagation();
+  if (!account.user) return openLogin();
+  $('userMenu').hidden = !$('userMenu').hidden;
+};
+$('setupLoginBtn').onclick = openLogin;
+document.addEventListener('click', () => ($('userMenu').hidden = true));
+$('userMenu').onclick = async (e) => {
+  if (e.target.dataset.act !== 'logout') return;
+  if (saveTimer) await flushCloudSave();
+  await account.logout();
+  switchOwner(null);
+  toastMsg('Logged out. You are playing as a guest.');
+};
+$('loginClose').onclick = () => $('loginDialog').close();
+$('loginGuest').onclick = () => $('loginDialog').close();
+$('loginForm').onsubmit = async (e) => {
+  e.preventDefault();
+  $('loginOk').disabled = true;
+  $('loginErr').hidden = true;
+  try {
+    const guestCode = editor.getValue();
+    const u = await account.login($('loginUser').value.trim(), $('loginPass').value);
+    $('loginDialog').close();
+    switchOwner(guestCode);
+    toastMsg(u.role === 'coach' ? 'Logged in as coach (nothing is saved here).' : 'Hi ' + u.name + '! Your work will be saved.');
+  } catch (err) {
+    $('loginErr').textContent = err.message; $('loginErr').hidden = false;
+  } finally {
+    $('loginOk').disabled = false;
+  }
+};
+await account.init();
+renderUser();
 applyRobotSetup(defaultSetup());
 
 const startId = location.hash.slice(1) || store.get('pyb-map') || PYB.MAPS[0].id;
@@ -573,4 +681,4 @@ selectMap(PYB.MAPS.some(m => m.id === startId) ? startId : PYB.MAPS[0].id);
 requestAnimationFrame(loop);
 if (store.get('pyb-setup-ask') !== '0') openSetup();
 // debugging hook (also lets tests advance the replay while the tab is hidden)
-window.__pyb = { world, play, editor, run, applyRobotSetup, openSetup, step: (ms) => { lastNow = performance.now() - ms; loop(performance.now(), true); } };
+window.__pyb = { world, play, editor, run, applyRobotSetup, openSetup, account, step: (ms) => { lastNow = performance.now() - ms; loop(performance.now(), true); } };
