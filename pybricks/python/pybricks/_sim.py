@@ -48,24 +48,25 @@ def tick():
     S.tick()
 
 
+def _ports():
+    import json
+    return json.loads(S.portInfo())
+
+
 def no_device(port, wanted):
-    from pybricks.parameters import Port
-    labels = {
-        'A': 'the left drive motor', 'B': 'the right drive motor', 'C': 'the arm motor',
-        'D': 'a ColorSensor', 'E': 'an UltrasonicSensor', 'F': 'a ForceSensor',
-    }
     name = getattr(port, 'name', str(port))
-    have = labels.get(name, 'nothing')
-    raise OSError(19, 'ENODEV: no {} found on Port.{} (this robot has {} there)'.format(wanted, name, have))
-
-
-KINDS = {'A': 'motor', 'B': 'motor', 'C': 'motor', 'D': 'color', 'E': 'ultrasonic', 'F': 'force'}
+    info = _ports().get(name)
+    have = info['label'].split(' (')[0].lower() if info else 'nothing'
+    if info and not have.startswith(('a ', 'the ')):
+        have = ('the ' if info['kind'] == 'motor' else 'an ' if have[0] in 'aeiou' else 'a ') + have
+    raise OSError(19, 'ENODEV: no {} found on Port.{} (this robot has {} there - check the Robot setup)'.format(wanted, name, have))
 
 
 def port_name(port, wanted, kind):
     from pybricks.parameters import Port
     if not isinstance(port, Port._Member):
         raise TypeError('port must be a Port, like Port.A')
-    if KINDS.get(port.name) != kind:
+    info = _ports().get(port.name)
+    if not info or info['kind'] != kind:
         no_device(port, wanted)
     return port.name

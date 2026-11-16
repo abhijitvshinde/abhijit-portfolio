@@ -120,7 +120,7 @@
   class SimDriveBase {
     constructor(sim, lp, ls, rp, rs, wd, at) {
       this.sim = sim;
-      this.L = sim.motors[lp]; this.R = sim.motors[rp];
+      this.L = sim.m(lp); this.R = sim.m(rp);
       this.ls = ls; this.rs = rs; this.wd = wd; this.track = at;
       this.L.owner = this; this.R.owner = this;
       this.mode = 'none'; this.then = 'hold';
@@ -306,7 +306,14 @@
       const st = map.start;
       this.pose = { x: st.x, y: st.y, yaw: (st.yaw || 0) * DEG };
       this.yaw0 = this.pose.yaw; this.yawRate = 0; this.headingOff = 0;
+      // internal motors: A = left wheel, B = right wheel, C = arm. The robot setup says
+      // which user port each one is plugged into and which way it is mounted.
       this.motors = { A: new SimMotor('A'), B: new SimMotor('B'), C: new SimMotor('C') };
+      const su = R.setup || g.PYB.cleanSetup({});
+      this.pm = {}; this.pm[su.left] = 'A'; this.pm[su.right] = 'B'; this.pm[su.arm] = 'C';
+      this.sL = su.mirrored === 'left' ? -1 : 1;   // left wheel: + shaft angle drives forward?
+      this.sR = su.mirrored === 'right' ? -1 : 1;
+      this.armSign = su.armUp < 0 ? -1 : 1;
       this.db = null;
       this.frames = []; this.events = [];
       this.contacts = new Set(); this.bumps = {}; this.bumpTotal = 0;
@@ -329,7 +336,7 @@
     }
 
     // ----- basic state -----
-    armDeg() { return R.armStart + this.motors.C.angle; }
+    armDeg() { return R.armStart + this.armSign * this.motors.C.angle; }
     trueHeading() { return -(this.pose.yaw - this.yaw0) / DEG; }
     time() { return this.t; }
     now() { return typeof performance !== 'undefined' ? performance.now() : Date.now(); }
@@ -345,7 +352,7 @@
     emitPrint(text, level) { this.events.push({ t: this.t, type: 'print', text: String(text), level: level || 'out' }); this.maybeFlush(true); }
     pushFrame() {
       const m = this.motors;
-      this.frames.push([this.t, this.pose.x, this.pose.y, this.pose.yaw, this.armDeg(), m.A.angle, m.B.angle]);
+      this.frames.push([this.t, this.pose.x, this.pose.y, this.pose.yaw, this.armDeg(), -this.sL * m.A.angle, this.sR * m.B.angle]);
     }
     maybeFlush(force) {
       const n = this.now();
@@ -406,7 +413,7 @@
       let frac = 0;
       if (Math.abs(dA) > 1e-9 || Math.abs(dB) > 1e-9) {
         for (const f of [1, 0.5, 0.2]) {
-          const np = this.movedPose(-dA * f * kP, dB * f * kP);
+          const np = this.movedPose(this.sL * dA * f * kP, this.sR * dB * f * kP);
           const hit = this.robotHit(np, arm);
           if (!hit) { frac = f; this.pose = np; break; }
           this.contact(hit);
@@ -414,7 +421,7 @@
       }
       const prevYaw = this.pose.yaw;
       // arm
-      let dC = M.C.desired * DT;
+      let dC = this.armSign * M.C.desired * DT;
       let armNew = arm + dC;
       if (armNew > R.armMax) { armNew = R.armMax; }
       if (armNew < R.armMin) { armNew = R.armMin; }
@@ -427,7 +434,7 @@
           realC = this.armHit(this.pose, half) ? 0 : realC / 3;
         }
       }
-      M.A.apply(dA * frac, DT); M.B.apply(dB * frac, DT); M.C.apply(realC, DT);
+      M.A.apply(dA * frac, DT); M.B.apply(dB * frac, DT); M.C.apply(this.armSign * realC, DT);
       this.contacts = this.tickContacts;
       this.yawRate = (this.pose.yaw - this.lastYaw || 0) / DT; this.lastYaw = this.pose.yaw;
       void prevYaw;
@@ -488,7 +495,8 @@
     }
 
     // ----- motor API (raw shaft degrees, positive = clockwise) -----
-    m(p) { const mo = this.motors[p]; if (!mo) throw new Error('No motor on port ' + p); return mo; }
+    m(p) { const mo = this.motors[this.pm[p]]; if (!mo) throw new Error('No motor on port ' + p); return mo; }
+    portInfo() { return JSON.stringify(R.ports); }
     mAttach(p) { const mo = this.m(p); if (mo.owner && mo.owner.mode !== 'none') mo.owner.abandon(mo); mo.owner = null; if (this.db && (this.db.L === mo || this.db.R === mo)) this.db = null; mo.mode = 'coast'; }
     mRun(p, v) { this.m(p).run(v); }
     mRunTime(p, v, ms, then) { this.m(p).runTime(v, ms, THEN[then] || 'hold', this.t); }

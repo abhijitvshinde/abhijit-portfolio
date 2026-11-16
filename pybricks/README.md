@@ -24,6 +24,16 @@ missions on a 3D table. It is a plain static site (no build step), so it can be 
 
 Wheels: 56 mm, axle track 112 mm. Body: 150 × 130 × 95 mm. All values live in `js/shared.js`.
 
+### Robot setup
+
+The table above is the **Robot Lab standard** setup. The 🤖 button (also shown when the page opens) lets
+players pick another setup so the code for their real robot runs unchanged: which port each motor and sensor
+is on, which drive motor is mirrored, which way the arm motor turns, and the wheel diameter / axle track.
+Presets live in `SETUP_PRESETS` in `js/shared.js` (`lab`, `team`); `DEFAULT_SETUP` picks the one new visitors
+start with. A player's own choice ("Make this my default robot") is saved in their browser and wins over
+`DEFAULT_SETUP`. Map starter programs are written for the standard robot and are rewritten automatically for
+the chosen setup.
+
 Rules the sim enforces:
 
 - The body collides with anything lower than 95 mm. The arm collides with anything in its path, including

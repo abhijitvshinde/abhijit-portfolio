@@ -37,6 +37,7 @@
       </label>
     </div>
     <div class="actions right">
+      <button id="setupBtn" class="btn ghost" title="Choose which port each motor and sensor is on">🤖 <span id="setupName">Robot setup</span></button>
       <button id="refBtn" class="btn ghost">📖 Pybricks reference</button>
       <button id="moreBtn" class="btn ghost" aria-haspopup="true">⋯</button>
       <div id="moreMenu" class="menu" hidden>
@@ -98,6 +99,29 @@
       </div>
     </section>
   </main>
+
+  <dialog id="setupDialog" class="setup" aria-labelledby="setupTitle">
+    <form method="dialog" id="setupForm">
+      <div class="setup-head">
+        <h2 id="setupTitle">Robot setup</h2>
+        <button type="button" class="btn ghost" id="setupClose" aria-label="Close">✕</button>
+      </div>
+      <p class="setup-intro">Pick the robot you are programming. Match your real robot and the same program runs here and on the table.</p>
+      <div class="presets" id="setupPresets" role="radiogroup" aria-label="Robot"></div>
+      <details class="setup-more" id="setupMore">
+        <summary>Ports and wheels</summary>
+        <div class="setup-grid" id="setupGrid"></div>
+      </details>
+      <p class="setup-err" id="setupErr" hidden></p>
+      <div class="setup-code-label">Start your program with:</div>
+      <pre class="setup-code" id="setupCode"></pre>
+      <label class="check"><input type="checkbox" id="setupDefault"> Make this my default robot</label>
+      <label class="check"><input type="checkbox" id="setupAsk"> Show this screen when the Robot Lab opens</label>
+      <div class="setup-foot">
+        <button type="submit" class="btn primary" id="setupOk">Use this robot</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="refDialog" class="ref">
     <div class="ref-head">

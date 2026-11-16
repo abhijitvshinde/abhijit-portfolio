@@ -215,3 +215,28 @@ dialog.ref::backdrop { background: rgba(10, 14, 20, .5); }
   .hud { grid-template-columns: repeat(2, auto); }
   .hubw { transform: scale(.8); transform-origin: bottom right; }
 }
+
+/* ---- robot setup dialog ---- */
+.setup { width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--ink); }
+.setup::backdrop { background: rgba(10, 14, 20, .55); }
+.setup form { padding: 16px 20px 18px; display: flex; flex-direction: column; gap: 10px; }
+.setup-head { display: flex; align-items: center; justify-content: space-between; }
+.setup-head h2 { margin: 0; font-size: 19px; }
+.setup-intro { margin: 0; color: var(--muted); font-size: 14px; }
+.presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.preset { text-align: left; border: 2px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--panel); color: var(--ink); cursor: pointer; font: inherit; }
+.preset:hover { border-color: var(--accent); }
+.preset[aria-checked="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.preset b { display: block; font-size: 14px; margin-bottom: 3px; }
+.preset span { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.preset .tag { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 700; color: var(--good); }
+.setup-more summary { cursor: pointer; font-weight: 600; font-size: 14px; padding: 4px 0; }
+.setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; margin-top: 8px; }
+.setup-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: var(--muted); }
+.setup-grid select, .setup-grid input { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 14px; }
+.setup-err { margin: 0; color: var(--bad); font-weight: 600; font-size: 13px; }
+.setup-code-label { font-size: 12.5px; color: var(--muted); }
+.setup-code { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--console-bg); color: var(--console-ink); font: 12.5px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; overflow-x: auto; white-space: pre; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.setup-foot { display: flex; justify-content: flex-end; margin-top: 4px; }
+@media (max-width: 520px) { .setup-grid { grid-template-columns: 1fr; } }

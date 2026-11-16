@@ -238,11 +238,12 @@ export class World {
     this.wheels = [];
     for (const side of [-1, 1]) {
       const wg = new THREE.Group();
-      const tyre = new THREE.Mesh(new THREE.CylinderGeometry(28, 28, 14, 32), dark);
+      const wr = R.wheelDiameter / 2;
+      const tyre = new THREE.Mesh(new THREE.CylinderGeometry(wr, wr, 14, 32), dark);
       tyre.rotation.x = Math.PI / 2; tyre.castShadow = true;
-      const rim = new THREE.Mesh(new THREE.BoxGeometry(40, 8, 15), white);
+      const rim = new THREE.Mesh(new THREE.BoxGeometry(wr * 1.4, 8, 15), white);
       wg.add(tyre); wg.add(rim);
-      wg.position.set(0, 28, side * R.axleTrack / 2);
+      wg.position.set(0, wr, side * R.axleTrack / 2);
       robot.add(wg);
       this.wheels.push(wg);
     }
@@ -316,6 +317,16 @@ export class World {
     for (const id in this.zoneMeshes) this.zoneMeshes[id].material.opacity = 0;
     this.setHubLight([0, 0, 100]);
     this.setDisplay(null);
+  }
+
+  // rebuild the robot model after the robot setup (wheel size, axle track) changed
+  rebuildRobot() {
+    if (this.robot) {
+      this.scene.remove(this.robot);
+      this.robot.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    }
+    this.buildRobot();
+    if (this.pose) this.setRobot(this.pose);
   }
 
   setRobot(s) {

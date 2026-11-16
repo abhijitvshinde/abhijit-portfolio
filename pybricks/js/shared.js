@@ -49,8 +49,118 @@
     magenta:{ rgb: '#c84aa4', h: 316, s: 64, v: 78,  refl: 40 }
   };
 
+  // ---------- robot setups ----------
+  // Which port each device is plugged into, and the drive geometry.
+  // `mirrored`: which drive motor is mounted facing the other way (that one needs
+  // Direction.COUNTERCLOCKWISE so that + drives forward). `armUp`: +1 if a positive
+  // motor angle raises the arm, -1 if it lowers it. Sensor ports may be 'none'.
+  const SETUP_PRESETS = {
+    lab: {
+      name: 'Robot Lab standard',
+      desc: 'Drive motors on A and B, arm on C, sensors on D, E and F. 56 mm wheels.',
+      left: 'A', right: 'B', arm: 'C', color: 'D', ultrasonic: 'E', force: 'F',
+      mirrored: 'left', armUp: 1, wheel: 56, track: 112
+    },
+    team: {
+      name: 'Team robot',
+      desc: 'Right motor on A, left motor on B, attachment motor on D, 88 mm wheels.',
+      left: 'B', right: 'A', arm: 'D', color: 'C', ultrasonic: 'E', force: 'F',
+      mirrored: 'left', armUp: 1, wheel: 88, track: 160
+    }
+  };
+  // The setup new visitors start with. Change this to 'team' to make that the site default.
+  const DEFAULT_SETUP = 'lab';
+  const DEVICE_ROLES = [
+    { key: 'left', kind: 'motor', label: 'Left drive motor' },
+    { key: 'right', kind: 'motor', label: 'Right drive motor' },
+    { key: 'arm', kind: 'motor', label: 'Arm motor' },
+    { key: 'color', kind: 'color', label: 'Color sensor (points down)' },
+    { key: 'ultrasonic', kind: 'ultrasonic', label: 'Ultrasonic sensor (faces forward)' },
+    { key: 'force', kind: 'force', label: 'Force sensor (on the arm tip)' }
+  ];
+  const BASE_HALF_WIDTH = ROBOT.halfWidth;
+  const short = (r) => r.label.replace(/ \(.*/, '');
+
+  function cleanSetup(s) {
+    const d = SETUP_PRESETS.lab, o = {};
+    s = s || {};
+    for (const r of DEVICE_ROLES) {
+      const p = s[r.key];
+      o[r.key] = /^[A-F]$/.test(p) || (p === 'none' && r.kind !== 'motor') ? p : d[r.key];
+    }
+    o.mirrored = s.mirrored === 'right' ? 'right' : 'left';
+    o.armUp = Number(s.armUp) === -1 ? -1 : 1;
+    const w = Number(s.wheel), t = Number(s.track);
+    o.wheel = w >= 20 && w <= 150 ? w : d.wheel;
+    o.track = t >= 60 && t <= 250 ? t : d.track;
+    return o;
+  }
+  // Returns a message when two devices share a port, '' when the setup is fine.
+  function setupProblem(s) {
+    const used = {};
+    for (const r of DEVICE_ROLES) {
+      const p = s[r.key];
+      if (p === 'none') continue;
+      if (used[p]) return used[p] + ' and ' + short(r).toLowerCase() + ' are both on Port ' + p + '.';
+      used[p] = short(r);
+    }
+    return '';
+  }
+  // Apply a setup to ROBOT (geometry + port table). Called on the page and in the worker.
+  function applySetup(s) {
+    s = cleanSetup(s);
+    ROBOT.setup = s;
+    ROBOT.wheelDiameter = s.wheel;
+    ROBOT.axleTrack = s.track;
+    // the wheels count as part of the body for collisions
+    ROBOT.halfWidth = Math.max(BASE_HALF_WIDTH, s.track / 2 + ROBOT.wheelWidth / 2);
+    const byPort = {};
+    for (const r of DEVICE_ROLES) {
+      if (s[r.key] === 'none') continue;
+      let label = r.label;
+      if (r.key === s.mirrored) label += ' (mirrored: use Direction.COUNTERCLOCKWISE)';
+      if (r.key === 'arm') label += s.armUp > 0 ? ' (+ raises the arm)' : ' (+ lowers the arm: use Direction.COUNTERCLOCKWISE)';
+      byPort[s[r.key]] = { kind: r.kind, role: r.key, label };
+    }
+    ROBOT.ports = {};
+    for (const p of 'ABCDEF') if (byPort[p]) ROBOT.ports[p] = byPort[p];
+    return s;
+  }
+  // The motor + DriveBase lines of a program, written for a setup.
+  function setupCode(s) {
+    const ccw = (b) => (b ? ', Direction.COUNTERCLOCKWISE' : '');
+    return [
+      `left_motor = Motor(Port.${s.left}${ccw(s.mirrored === 'left')})`,
+      `right_motor = Motor(Port.${s.right}${ccw(s.mirrored === 'right')})`,
+      `arm = Motor(Port.${s.arm}${ccw(s.armUp < 0)})          # positive angle = arm goes up`,
+      '',
+      `drive_base = DriveBase(left_motor, right_motor, wheel_diameter=${s.wheel}, axle_track=${s.track})`
+    ].join('\n');
+  }
+  // Rewrite a map's starter program (written for the standard robot) for another setup.
+  function adaptStarter(code, s) {
+    const lab = cleanSetup(SETUP_PRESETS.lab);
+    let out = code.replace(setupCode(lab), setupCode(s));
+    if (s.mirrored === 'right') out = out.replace('the left one is mirrored', 'the right one is mirrored');
+    const sensors = { ColorSensor: 'color', UltrasonicSensor: 'ultrasonic', ForceSensor: 'force' };
+    for (const cls in sensors) {
+      const p = s[sensors[cls]];
+      if (p !== 'none') out = out.split(cls + '(Port.' + lab[sensors[cls]] + ')').join(cls + '(Port.' + p + ')');
+    }
+    return out;
+  }
+
   g.PYB = g.PYB || {};
   g.PYB.ROBOT = ROBOT;
+  g.PYB.SETUP_PRESETS = SETUP_PRESETS;
+  g.PYB.DEFAULT_SETUP = DEFAULT_SETUP;
+  g.PYB.DEVICE_ROLES = DEVICE_ROLES;
+  g.PYB.cleanSetup = cleanSetup;
+  g.PYB.setupProblem = setupProblem;
+  g.PYB.applySetup = applySetup;
+  g.PYB.setupCode = setupCode;
+  g.PYB.adaptStarter = adaptStarter;
+  applySetup(SETUP_PRESETS.lab);
   g.PYB.MAT_COLORS = MAT_COLORS;
   g.PYB.MAPS = g.PYB.MAPS || [];
   g.PYB.BORDER = { thickness: 50, height: 75 };

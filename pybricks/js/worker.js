@@ -35,6 +35,7 @@ self.onmessage = async (e) => {
   await ready;
   if (!pyodide) return;
   const map = PYB.MAPS.find(m => m.id === msg.mapId);
+  PYB.applySetup(msg.setup);
   const sim = new PybSim(map, { post: (m) => postMessage(m) });
   self.SIM = sim;
   let res;

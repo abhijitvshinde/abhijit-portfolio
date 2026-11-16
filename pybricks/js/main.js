@@ -154,7 +154,8 @@ function selectMap(id) {
   $('mapSelect').value = map.id;
   store.set('pyb-map', map.id);
   if (location.hash !== '#' + map.id) history.replaceState(null, '', '#' + map.id);
-  editor.setValue(store.get('pyb-code-' + map.id) || map.starter);
+  const saved = store.get('pyb-code-' + map.id);
+  editor.setValue(!saved || isStarterCode(saved) ? starterCode() : saved);
   editor.clearHistory();
   world.loadMap(map);
   resetPlayback();
@@ -197,7 +198,9 @@ function renderRobotTab() {
   const el = $('tab-robot');
   const rows = Object.entries(R.ports).map(([p, v]) => `<tr><td>Port.${p}</td><td>${v.label}</td></tr>`).join('');
   el.innerHTML = `
-    <table class="spec"><tbody>${rows}</tbody></table>
+    <p class="blurb">Robot setup: <b>${setupLabel(R.setup)}</b>. Change it with the 🤖 button at the top. Your program should start with:</p>
+    <pre class="setup-code">${PYB.setupCode(R.setup)}</pre>
+    <table class="spec" style="margin-top:10px"><tbody>${rows}</tbody></table>
     <table class="spec" style="margin-top:10px"><tbody>
       <tr><td>Wheels</td><td>${R.wheelDiameter} mm diameter, ${R.axleTrack} mm apart (axle track)</td></tr>
       <tr><td>Body</td><td>150 mm long, 130 mm wide, ${R.bodyHeight} mm tall. Front is ${R.bodyFront} mm ahead of the wheel axle.</td></tr>
@@ -247,7 +250,7 @@ function run() {
   consoleLine('▶ Running main.py on "' + map.name + '"', 'sys');
   setStatus('Running…', 'busy');
   $('stopBtn').disabled = false;
-  worker.postMessage({ type: 'run', code: editor.getValue(), mapId: map.id });
+  worker.postMessage({ type: 'run', code: editor.getValue(), mapId: map.id, setup: R.setup });
 }
 function stopRun(silent) {
   const busy = play.active && !play.workerDone;
@@ -437,7 +440,7 @@ $('moreBtn').onclick = (e) => { e.stopPropagation(); $('moreMenu').hidden = !$('
 document.addEventListener('click', () => ($('moreMenu').hidden = true));
 $('moreMenu').onclick = (e) => {
   const act = e.target.dataset.act;
-  if (act === 'starter') { if (confirm('Replace your code with the starter code for this map?')) editor.setValue(map.starter); }
+  if (act === 'starter') { if (confirm('Replace your code with the starter code for this map?')) editor.setValue(starterCode()); }
   else if (act === 'download') {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([editor.getValue()], { type: 'text/x-python' }));
@@ -451,8 +454,123 @@ $('fileInput').onchange = async (e) => {
 };
 window.addEventListener('hashchange', () => { const id = location.hash.slice(1); if (id && id !== map.id) selectMap(id); });
 
+// ---------- robot setup ----------
+const SETUP_KEYS = ['left', 'right', 'arm', 'color', 'ultrasonic', 'force', 'mirrored', 'armUp', 'wheel', 'track'];
+const sameSetup = (a, b) => !!a && !!b && SETUP_KEYS.every(k => String(a[k]) === String(b[k]));
+const presetList = () => Object.entries(PYB.SETUP_PRESETS).map(([id, p]) => ({ id, name: p.name, desc: p.desc, s: PYB.cleanSetup(p) }));
+function readSetup(key) {
+  try { const j = store.get(key); return j ? PYB.cleanSetup(JSON.parse(j)) : null; } catch (e) { return null; }
+}
+function defaultSetup() {
+  return readSetup('pyb-setup-default') || PYB.cleanSetup(PYB.SETUP_PRESETS[PYB.DEFAULT_SETUP] || PYB.SETUP_PRESETS.lab);
+}
+function setupLabel(s) {
+  const p = presetList().find(o => sameSetup(o.s, s));
+  return p ? p.name : 'My robot';
+}
+function describeSetup(s) {
+  return `Drive motors on ${s.left} (left) and ${s.right} (right), arm on ${s.arm}, ${s.wheel} mm wheels.`;
+}
+function starterCode() { return PYB.adaptStarter(map.starter, R.setup); }
+// true when the code is this map's starter program for some setup (the kid hasn't changed it)
+function isStarterCode(code) {
+  const cands = presetList().map(o => o.s).concat([R.setup, defaultSetup(), readSetup('pyb-setup-custom')]);
+  return code === map.starter || cands.some(s => s && code === PYB.adaptStarter(map.starter, s));
+}
+function applyRobotSetup(s) {
+  PYB.applySetup(s);
+  $('setupName').textContent = setupLabel(R.setup);
+  world.rebuildRobot();
+  if (map) {
+    stopRun(true);
+    if (isStarterCode(editor.getValue())) editor.setValue(starterCode());
+    resetPlayback();
+    renderRobotTab();
+  }
+}
+
+let draft = null;
+function buildSetupGrid() {
+  const g = $('setupGrid');
+  const portOpts = (none) => 'ABCDEF'.split('').map(p => `<option value="${p}">Port ${p}</option>`).join('') + (none ? '<option value="none">Not used</option>' : '');
+  let html = '';
+  for (const r of PYB.DEVICE_ROLES) {
+    html += `<label>${r.label.replace(/ \(.*/, '')}<select data-k="${r.key}">${portOpts(r.kind !== 'motor')}</select></label>`;
+  }
+  html += '<label>Mirrored drive motor (needs COUNTERCLOCKWISE)<select data-k="mirrored"><option value="left">Left motor</option><option value="right">Right motor</option></select></label>';
+  html += '<label>Positive arm angle moves the arm<select data-k="armUp"><option value="1">Up</option><option value="-1">Down</option></select></label>';
+  html += '<label>Wheel diameter (mm)<input data-k="wheel" type="number" min="20" max="150" step="0.1" list="wheelSizes"></label>';
+  html += '<label>Axle track (mm, wheel to wheel)<input data-k="track" type="number" min="60" max="250" step="1"></label>';
+  html += '<datalist id="wheelSizes"><option value="56"><option value="62.4"><option value="88"></datalist>';
+  g.innerHTML = html;
+  g.querySelectorAll('[data-k]').forEach(el => {
+    el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => {
+      const k = el.dataset.k;
+      draft[k] = el.tagName === 'INPUT' || k === 'armUp' ? Number(el.value) : el.value;
+      renderSetupDialog(false);
+    });
+  });
+}
+function setupError(s) {
+  if (!(s.wheel >= 20 && s.wheel <= 150)) return 'Wheel diameter must be between 20 and 150 mm.';
+  if (!(s.track >= 60 && s.track <= 250)) return 'Axle track must be between 60 and 250 mm.';
+  return PYB.setupProblem(s);
+}
+function renderSetupDialog(fillGrid) {
+  const def = defaultSetup();
+  const opts = presetList();
+  const mine = opts.some(o => sameSetup(o.s, draft)) ? readSetup('pyb-setup-custom') : draft;
+  const mineOwn = mine && !opts.some(o => sameSetup(o.s, mine));
+  opts.push({ id: 'custom', name: 'My robot', desc: mineOwn ? describeSetup(mine) : 'Choose your own ports and wheel size.', s: mineOwn ? mine : null });
+  const box = $('setupPresets');
+  box.innerHTML = '';
+  for (const o of opts) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'preset'; b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', o.s && sameSetup(o.s, draft) ? 'true' : 'false');
+    b.innerHTML = '<b></b><span></span>' + (o.s && sameSetup(o.s, def) ? '<em class="tag">★ Default</em>' : '');
+    b.querySelector('b').textContent = o.name;
+    b.querySelector('span').textContent = o.desc;
+    b.onclick = () => {
+      if (o.s) draft = Object.assign({}, o.s);
+      else $('setupMore').open = true;
+      renderSetupDialog(true);
+    };
+    box.appendChild(b);
+  }
+  if (fillGrid) $('setupGrid').querySelectorAll('[data-k]').forEach(el => { el.value = String(draft[el.dataset.k]); });
+  const err = setupError(draft);
+  $('setupErr').hidden = !err; $('setupErr').textContent = err;
+  $('setupOk').disabled = !!err;
+  $('setupCode').textContent = err ? '' : PYB.setupCode(PYB.cleanSetup(draft));
+  $('setupDefault').checked = !err && sameSetup(PYB.cleanSetup(draft), def);
+}
+function openSetup() {
+  draft = Object.assign({}, R.setup);
+  $('setupMore').open = !presetList().some(o => sameSetup(o.s, draft));
+  $('setupAsk').checked = store.get('pyb-setup-ask') !== '0';
+  renderSetupDialog(true);
+  $('setupDialog').showModal();
+}
+buildSetupGrid();
+$('setupBtn').onclick = openSetup;
+$('setupClose').onclick = () => $('setupDialog').close();
+$('setupAsk').onchange = (e) => store.set('pyb-setup-ask', e.target.checked ? '1' : '0');
+$('setupForm').onsubmit = (e) => {
+  e.preventDefault();
+  if (setupError(draft)) return;
+  const s = PYB.cleanSetup(draft);
+  if (!presetList().some(o => sameSetup(o.s, s))) store.set('pyb-setup-custom', JSON.stringify(s));
+  if ($('setupDefault').checked) store.set('pyb-setup-default', JSON.stringify(s));
+  else if (sameSetup(readSetup('pyb-setup-default'), s)) { try { localStorage.removeItem('pyb-setup-default'); } catch (err) { /* ignore */ } }
+  $('setupDialog').close();
+  applyRobotSetup(s);
+};
+applyRobotSetup(defaultSetup());
+
 const startId = location.hash.slice(1) || store.get('pyb-map') || PYB.MAPS[0].id;
 selectMap(PYB.MAPS.some(m => m.id === startId) ? startId : PYB.MAPS[0].id);
 requestAnimationFrame(loop);
+if (store.get('pyb-setup-ask') !== '0') openSetup();
 // debugging hook (also lets tests advance the replay while the tab is hidden)
-window.__pyb = { world, play, editor, run, step: (ms) => { lastNow = performance.now() - ms; loop(performance.now(), true); } };
+window.__pyb = { world, play, editor, run, applyRobotSetup, openSetup, step: (ms) => { lastNow = performance.now() - ms; loop(performance.now(), true); } };
