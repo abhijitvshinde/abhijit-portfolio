@@ -77,7 +77,7 @@
         hint: 'color_sensor.color() tells you what is under the sensor. Where is the robot centre when the sensor is on the stripe?' },
       { id: 'i4r', type: 'pose', after: 'i4b', x: 855, y: 500, r: 10, points: 50, name: 'Red Finish',
         desc: 'Then end with the colour sensor over the red stripe (robot centre within 10 mm of the dot).' },
-      { id: 'i4f', type: 'fast', time: 15, points: 20, name: 'Quick', desc: 'Bonus: finish both in 15 seconds or less.' }
+      { id: 'i4f', type: 'fast', time: 10, points: 20, name: 'Quick', desc: 'Bonus: finish both in 10 seconds or less.' }
     ]
   });
 

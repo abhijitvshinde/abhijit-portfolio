@@ -16,7 +16,7 @@
           hint: 'At each point the robot turns by the same amount. The outside angle of a star point is not 36°.' },
         { id: 'm1p', type: 'pose', after: 'm1k', x: 400, y: 360, r: 10, heading: 0, headingTol: 2, points: 30, name: 'Close the Star',
           desc: 'Then end on the start dot (±10 mm) facing east (±2°).' },
-        { id: 'm1f', type: 'fast', time: 30, points: 20, name: 'Shooting Star', desc: 'Bonus: finish in 30 seconds or less.' }
+        { id: 'm1f', type: 'fast', time: 20, points: 20, name: 'Shooting Star', desc: 'Bonus: finish in 20 seconds or less.' }
       ]
     });
   }
@@ -58,7 +58,7 @@
           desc: 'End within 6 mm of the dot, facing the arrow within 1°.',
           hint: 'Pick a lining-up point in front of the slot on the arrow\'s line. Measure to it, then reverse in a straight line.' },
         { id: 'm3c', type: 'clean', minMissions: 1, points: 20, name: 'No Scratches', desc: 'Bonus: don\'t touch the slot walls.' },
-        { id: 'm3f', type: 'fast', time: 12, points: 20, name: 'Quick Park', desc: 'Bonus: park in 12 seconds or less.' }
+        { id: 'm3f', type: 'fast', time: 9, points: 20, name: 'Quick Park', desc: 'Bonus: park in 9 seconds or less.' }
       ]
     });
   }
@@ -85,7 +85,7 @@
         hint: 'drive_base.straight(..., wait=False) keeps driving while your code moves the arm. drive_base.distance() tells you where you are.' },
       { id: 'm4p', type: 'pose', after: 'm4t', x: 1350, y: 500, r: 20, points: 30, name: 'Through', desc: 'Then end on the dot (±20 mm).' },
       { id: 'm4c', type: 'clean', minMissions: 1, points: 20, name: 'Clean Rush', desc: 'Bonus: don\'t touch a beam or pillar.' },
-      { id: 'm4f', type: 'fast', time: 5.7, points: 20, name: 'Rush', desc: 'Bonus: finish in 5.7 seconds or less.' }
+      { id: 'm4f', type: 'fast', time: 3.8, points: 20, name: 'Rush', desc: 'Bonus: finish in 3.8 seconds or less.' }
     ]
   });
 
@@ -101,7 +101,7 @@
         desc: 'End on the dot (±10 mm) facing north (±2°).',
         hint: 'Find gaps you can see through with a straight line. Measure each leg from the point where the last one ended.' },
       { id: 'm5c', type: 'clean', minMissions: 1, points: 30, name: 'No Impacts', desc: 'Bonus: don\'t touch a single rock.' },
-      { id: 'm5f', type: 'fast', time: 20, points: 20, name: 'Warp Speed', desc: 'Bonus: land in 20 seconds or less.' }
+      { id: 'm5f', type: 'fast', time: 14, points: 20, name: 'Warp Speed', desc: 'Bonus: land in 14 seconds or less.' }
     ]
   });
 
@@ -128,7 +128,7 @@
         { id: 'm6b', type: 'touch', target: 'bell', after: 'm6y', points: 25, name: 'Ring the Bell', desc: 'Then touch the 205 mm bell.' },
         { id: 'm6p', type: 'pose', after: 'm6b', x: S3[0], y: S3[1], r: 5, heading: 200, headingTol: 1, points: 35, name: 'Final Park',
           desc: 'Then reverse into the slot: end within 5 mm of the dot, facing 200° (±1°).' },
-        { id: 'm6f', type: 'fast', time: 30, points: 10, name: 'Under 30 s', desc: 'Bonus: finish everything in 30 seconds or less.' },
+        { id: 'm6f', type: 'fast', time: 20, points: 10, name: 'Under 20 s', desc: 'Bonus: finish everything in 20 seconds or less.' },
         { id: 'm6c', type: 'clean', minMissions: 2, points: 10, name: 'Clean Exam', desc: 'Bonus: no bumps at all.' }
       ]
     });

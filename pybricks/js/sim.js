@@ -125,7 +125,8 @@
       this.L.owner = this; this.R.owner = this;
       this.mode = 'none'; this.then = 'hold';
       this.sOff = 0; this.hOff = 0; this.useGyro = false;
-      this.ss = 250; this.sa = 750; this.tr = 150; this.ta = 600;
+      // defaults (faster than a real hub's ~40% so the game feels snappy; settings() changes them)
+      this.ss = 400; this.sa = 1000; this.tr = 250; this.ta = 1000;
       this.refS = null; this.refH = null; this.isDone = true;
       this.sOff = this.rawS(); this.hOff = this.rawH();
     }

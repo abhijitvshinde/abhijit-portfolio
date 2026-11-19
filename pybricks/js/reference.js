@@ -86,7 +86,7 @@ export const REFERENCE = [
     ['drive_base.angle()', 'Angle turned since the start / last reset (deg).'],
     ['drive_base.state()', '(distance, speed, angle, turn_rate).'],
     ['drive_base.reset(distance=0, angle=0)', 'Reset distance and angle.'],
-    ['drive_base.settings(straight_speed, straight_acceleration, turn_rate, turn_acceleration)', 'Read or change speeds. Default 250 mm/s, 150 deg/s.'],
+    ['drive_base.settings(straight_speed, straight_acceleration, turn_rate, turn_acceleration)', 'Read or change speeds. Default here: 400 mm/s, 1000 mm/s², 250 deg/s, 1000 deg/s². A real hub starts slower, so match the speeds on your real robot.'],
     ['drive_base.use_gyro(True)', 'Use the hub gyro for turning.'],
     ['drive_base.done()  /  drive_base.stalled()', 'Status checks.'],
     ['Car(steer_motor, drive_motors)', 'A car with steering (this robot has no steering motor).']

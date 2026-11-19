@@ -17,7 +17,7 @@
         { id: 'a1p', type: 'pose', x: S[0], y: S[1], r: 8, heading: 123, headingTol: 1.5, points: 60, name: 'Precision Dock',
           desc: 'End within 8 mm and 1.5° of the target.',
           hint: '123° counterclockwise from east. Check your sign, then measure the reverse distance with 📏.' },
-        { id: 'a1f', type: 'fast', time: 5, points: 20, name: 'Quick Dock', desc: 'Bonus: finish in 5 seconds or less.' }
+        { id: 'a1f', type: 'fast', time: 4, points: 20, name: 'Quick Dock', desc: 'Bonus: finish in 4 seconds or less.' }
       ]
     });
   }
@@ -95,7 +95,7 @@
         { id: 'a5k', type: 'path', pts: L.slice(1, 6), r: 45, points: 50, name: 'On the Line', desc: 'Pass every bend of the line (checkpoints 1-5).',
           hint: 'color_sensor.reflection() is low on black and high on white. Steer by how far it is from the halfway value.' },
         { id: 'a5p', type: 'pose', after: 'a5k', x: 1300, y: 800, r: 25, points: 30, name: 'End of the Line', desc: 'End on the green circle (±25 mm).' },
-        { id: 'a5f', type: 'fast', time: 25, points: 20, name: 'Speedy', desc: 'Bonus: finish in 25 seconds or less.' }
+        { id: 'a5f', type: 'fast', time: 20, points: 20, name: 'Speedy', desc: 'Bonus: finish in 20 seconds or less.' }
       ]
     });
   }
