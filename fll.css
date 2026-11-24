@@ -168,7 +168,10 @@ button.fll-btn-good{ border:0; }
 #fllApp textarea,
 .coach-page input[type="text"],
 .coach-page input[type="password"],
-.coach-page select{
+.coach-page select,
+.team-page input[type="text"],
+.team-page input[type="password"],
+.team-page select{
   width:100%;
   padding:13px 15px;
   border-radius:14px;
@@ -184,7 +187,9 @@ button.fll-btn-good{ border:0; }
 #fllApp input:focus,
 #fllApp textarea:focus,
 .coach-page input:focus,
-.coach-page select:focus{
+.coach-page select:focus,
+.team-page input:focus,
+.team-page select:focus{
   outline:none;
   border-color:var(--fll-green);
   box-shadow:0 0 0 3px rgba(163,230,53,0.18);
