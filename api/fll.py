@@ -6,6 +6,9 @@ One endpoint, routed by ?action=...
   Kid    : progress (GET/POST), sketch (GET/POST)
            robot (GET/POST), robot_score (POST)   <- Pybricks Robot Lab (/pybricks/), same accounts
   Coach  : users, create_user, reset_password, delete_user, user_progress, sketch?username=
+  Team page (/fll-team.html, kid logins used by parents):
+           team (GET), team_avail, team_away, team_volunteer, team_parent (POST, kid)
+           team_meeting, team_mentor (POST, coach)
 
 Required environment variables (set in Vercel -> Project -> Settings -> Environment Variables):
   ADMIN_USERNAME      coach login name
@@ -48,6 +51,16 @@ ROBOT_SETUP_KEYS = {
     "color": "sensor", "ultrasonic": "sensor", "force": "sensor",
 }
 USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{2,23}$")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+ID_RE = re.compile(r"^[a-f0-9]{8}$")
+AVAIL = {"yes", "maybe", "no"}
+PARENTS = {"mother": "Mother", "father": "Father"}
+VOLUNTEER_KINDS = {"snacks", "present"}
+EVENT_TYPES = {"meeting", "zoo", "fundraiser", "team_visit", "outreach", "competition", "other"}
+MAX_MEETINGS = 120
+MAX_AWAY = 40
+MAX_MENTORS = 20
 
 
 # ---------------------------------------------------------------- storage
@@ -340,6 +353,13 @@ class handler(BaseHTTPRequestHandler):
                 ("GET", "robot"): self.get_robot,
                 ("POST", "robot"): self.save_robot,
                 ("POST", "robot_score"): self.save_robot_score,
+                ("GET", "team"): self.get_team,
+                ("POST", "team_avail"): self.team_avail,
+                ("POST", "team_away"): self.team_away,
+                ("POST", "team_volunteer"): self.team_volunteer,
+                ("POST", "team_parent"): self.team_parent,
+                ("POST", "team_meeting"): self.team_meeting,
+                ("POST", "team_mentor"): self.team_mentor,
             }
             fn = routes.get((method, action))
             if not fn:
@@ -660,7 +680,8 @@ class handler(BaseHTTPRequestHandler):
         self._require("coach")
         user = self._target_user()
         u = user["username"]
-        keys = [PREFIX + k for k in (f"user:{u}", f"progress:{u}", f"seen:{u}", f"robot:{u}", f"robotscore:{u}")]
+        keys = [PREFIX + k for k in (f"user:{u}", f"progress:{u}", f"seen:{u}", f"robot:{u}", f"robotscore:{u}",
+                                     f"team:avail:{u}", f"team:away:{u}", f"team:parents:{u}")]
         keys += [PREFIX + f"sketch:{u}:M{i:02d}" for i in range(1, 16)]
         self.store.pipeline([["DEL", *keys], ["SREM", PREFIX + "users", u]])
         self._send(200, {"ok": True})
@@ -674,3 +695,255 @@ class handler(BaseHTTPRequestHandler):
             "robot": self._get_json("robot:" + user["username"]) or {},
             "robotScores": self._get_json("robotscore:" + user["username"]) or {},
         })
+
+    # --- Team page: meeting availability + parent volunteer sign-up
+
+    def _parent(self):
+        parent = self.body.get("parent")
+        if parent not in PARENTS:
+            raise ApiError(400, "Tell us if you are the mother or father first.")
+        return PARENTS[parent]
+
+    def _signer(self, username):
+        """(role label, parent's saved name) for stamping an answer: ("Mother", "Priya")."""
+        by = self._parent()
+        names = self._get_json("team:parents:" + username) or {}
+        return by, names.get(self.body.get("parent"), "")
+
+    def _date(self, value, what="date"):
+        if not isinstance(value, str) or not DATE_RE.match(value):
+            raise ApiError(400, f"Pick a {what}.")
+        return value
+
+    def _time(self, value):
+        if value in (None, ""):
+            return ""
+        if not isinstance(value, str) or not TIME_RE.match(value):
+            raise ApiError(400, "Bad time.")
+        return value
+
+    def _id(self, value, what="item"):
+        if not isinstance(value, str) or not ID_RE.match(value):
+            raise ApiError(400, f"Unknown {what}.")
+        return value
+
+    def _meetings(self):
+        return self._get_json("team:meetings") or []
+
+    def _meeting(self, meeting_id):
+        meeting_id = self._id(meeting_id, "meeting")
+        for m in self._meetings():
+            if m["id"] == meeting_id:
+                return m
+        raise ApiError(404, "That meeting no longer exists.")
+
+    def _away_entry(self, by, name=""):
+        start = self._date(self.body.get("from"), "start date")
+        end = self._date(self.body.get("to"), "end date")
+        if end < start:
+            raise ApiError(400, "The end date is before the start date.")
+        return {"id": secrets.token_hex(4), "from": start, "to": end,
+                "note": clean_text(self.body.get("note"), 80), "by": by, "name": name}
+
+    def get_team(self):
+        sess, user = self._require("any")
+        meetings = self._meetings()
+        vol_raw = self.store.cmd("MGET", *[PREFIX + "team:vol:" + m["id"] for m in meetings]) if meetings else []
+        volunteers = {m["id"]: json.loads(v) for m, v in zip(meetings, vol_raw) if v}
+        out = {"meetings": meetings, "volunteers": volunteers}
+        if user is not None:
+            out["mine"] = {
+                "avail": self._get_json("team:avail:" + sess["u"]) or {},
+                "away": self._get_json("team:away:" + sess["u"]) or [],
+                "parents": self._get_json("team:parents:" + sess["u"]) or {},
+            }
+            return self._send(200, out)
+        # coach: everyone's availability and time away
+        names = sorted(self.store.cmd("SMEMBERS", PREFIX + "users") or [])
+        kids = []
+        if names:
+            keys = []
+            for n in names:
+                keys += [PREFIX + "user:" + n, PREFIX + "team:avail:" + n, PREFIX + "team:away:" + n,
+                         PREFIX + "team:parents:" + n]
+            raw = self.store.cmd("MGET", *keys)
+            for i, n in enumerate(names):
+                u_raw, a_raw, w_raw, p_raw = raw[4 * i: 4 * i + 4]
+                if not u_raw:
+                    continue
+                kids.append({
+                    "username": n, "name": json.loads(u_raw)["name"],
+                    "avail": json.loads(a_raw) if a_raw else {},
+                    "away": json.loads(w_raw) if w_raw else [],
+                    "parents": json.loads(p_raw) if p_raw else {},
+                })
+        out["kids"] = kids
+        out["mentors"] = self._get_json("team:mentors") or []
+        self._send(200, out)
+
+    def team_avail(self):
+        """Kid login (used by a parent): {meetingId, status: yes|maybe|no|'', parent}."""
+        sess, _ = self._require("kid")
+        by, name = self._signer(sess["u"])
+        meeting = self._meeting(self.body.get("meetingId"))
+        status = self.body.get("status") or ""
+        if status and status not in AVAIL:
+            raise ApiError(400, "Bad answer.")
+        avail = self._get_json("team:avail:" + sess["u"]) or {}
+        if status:
+            avail[meeting["id"]] = {"s": status, "by": by, "name": name, "at": int(time.time())}
+        else:
+            avail.pop(meeting["id"], None)
+        self._set_json("team:avail:" + sess["u"], avail)
+        self._send(200, {"ok": True, "avail": avail})
+
+    def team_away(self):
+        """Kid login: {op: add, from, to, note, parent} or {op: remove, id}."""
+        sess, _ = self._require("kid")
+        away = self._get_json("team:away:" + sess["u"]) or []
+        op = self.body.get("op")
+        if op == "add":
+            if len(away) >= MAX_AWAY:
+                raise ApiError(400, "That is a lot of trips! Remove an old one first.")
+            away.append(self._away_entry(*self._signer(sess["u"])))
+            away.sort(key=lambda a: a["from"])
+        elif op == "remove":
+            away_id = self._id(self.body.get("id"), "trip")
+            away = [a for a in away if a["id"] != away_id]
+        else:
+            raise ApiError(400, "Bad request.")
+        self._set_json("team:away:" + sess["u"], away)
+        self._send(200, {"ok": True, "away": away})
+
+    def team_volunteer(self):
+        """Kid login: {meetingId, kind: snacks|present, join: bool, parent}."""
+        sess, user = self._require("kid")
+        by, name = self._signer(sess["u"])
+        meeting = self._meeting(self.body.get("meetingId"))
+        kind = self.body.get("kind")
+        if kind not in VOLUNTEER_KINDS:
+            raise ApiError(400, "Bad request.")
+        key = "team:vol:" + meeting["id"]
+        vol = self._get_json(key) or {}
+        people = [p for p in vol.get(kind, []) if not (p["u"] == sess["u"] and p["by"] == by)]
+        if self.body.get("join"):
+            if meeting.get("status") != "scheduled":
+                raise ApiError(400, "Sign-up opens once the coach confirms this meeting.")
+            slots = int(meeting.get("slots", {}).get(kind, 1))
+            if len(people) >= slots:
+                raise ApiError(409, "Sorry, that spot was just taken.")
+            people.append({"u": sess["u"], "kid": user["name"], "by": by, "name": name, "at": int(time.time())})
+        vol[kind] = people
+        self._set_json(key, vol)
+        self._send(200, {"ok": True, "volunteers": vol})
+
+    def team_parent(self):
+        """Kid login: remember the parents' names for this child: {parent: mother|father, name}."""
+        sess, _ = self._require("kid")
+        self._parent()
+        name = clean_text(self.body.get("name"), 40)
+        if not name:
+            raise ApiError(400, "Type your name.")
+        names = self._get_json("team:parents:" + sess["u"]) or {}
+        names[self.body["parent"]] = name
+        self._set_json("team:parents:" + sess["u"], names)
+        self._send(200, {"ok": True, "parents": names})
+
+    def team_meeting(self):
+        """Coach: {op: add|update|remove, id?, type, title, date, start, end, place, note, status, slots}.
+        type: meeting (default) or an activity such as zoo, fundraiser, team_visit."""
+        self._require("coach")
+        meetings = self._meetings()
+        op = self.body.get("op")
+        if op == "remove":
+            meeting_id = self._id(self.body.get("id"), "meeting")
+            meetings = [m for m in meetings if m["id"] != meeting_id]
+            self.store.cmd("DEL", PREFIX + "team:vol:" + meeting_id)
+        elif op in ("add", "update"):
+            if op == "add":
+                if len(meetings) >= MAX_MEETINGS:
+                    raise ApiError(400, "Too many meetings. Remove some old ones first.")
+                kind = self.body.get("type") or "meeting"
+                meeting = {"id": secrets.token_hex(4), "status": "proposed", "type": "meeting",
+                           "slots": {"snacks": 1, "present": 1 if kind == "meeting" else 0}}
+                meetings.append(meeting)
+            else:
+                meeting_id = self._id(self.body.get("id"), "meeting")
+                meeting = next((m for m in meetings if m["id"] == meeting_id), None)
+                if not meeting:
+                    raise ApiError(404, "That meeting no longer exists.")
+            if op == "add" or "date" in self.body:
+                meeting["date"] = self._date(self.body.get("date"))
+            for field in ("start", "end"):
+                if op == "add" or field in self.body:
+                    meeting[field] = self._time(self.body.get(field))
+            if op == "add" or "type" in self.body:
+                kind = self.body.get("type") or "meeting"
+                if kind not in EVENT_TYPES:
+                    raise ApiError(400, "Unknown activity type.")
+                meeting["type"] = kind
+            for field, limit in (("title", 60), ("place", 60), ("note", 120)):
+                if op == "add" or field in self.body:
+                    meeting[field] = clean_text(self.body.get(field), limit)
+            if "status" in self.body:
+                if self.body["status"] not in ("proposed", "scheduled", "cancelled"):
+                    raise ApiError(400, "Bad status.")
+                meeting["status"] = self.body["status"]
+            if "slots" in self.body:
+                slots = self.body.get("slots")
+                if not isinstance(slots, dict):
+                    raise ApiError(400, "Bad slots.")
+                for kind in VOLUNTEER_KINDS:
+                    try:
+                        n = int(slots.get(kind, meeting["slots"].get(kind, 1)))
+                    except (TypeError, ValueError):
+                        raise ApiError(400, "Bad slots.")
+                    meeting["slots"][kind] = max(0, min(n, 10))
+        else:
+            raise ApiError(400, "Bad request.")
+        meetings.sort(key=lambda m: (m["date"], m.get("start", "")))
+        self._set_json("team:meetings", meetings)
+        self._send(200, {"ok": True, "meetings": meetings})
+
+    def team_mentor(self):
+        """Coach manages mentors (they have no logins):
+        {op: add, name} | {op: remove, id} | {op: avail, id, meetingId, status}
+        | {op: away_add, id, from, to, note} | {op: away_remove, id, awayId}"""
+        self._require("coach")
+        mentors = self._get_json("team:mentors") or []
+        op = self.body.get("op")
+        if op == "add":
+            name = clean_text(self.body.get("name"), 40)
+            if not name:
+                raise ApiError(400, "Type the mentor's name.")
+            if len(mentors) >= MAX_MENTORS:
+                raise ApiError(400, "Too many mentors.")
+            mentors.append({"id": secrets.token_hex(4), "name": name, "avail": {}, "away": []})
+        else:
+            mentor_id = self._id(self.body.get("id"), "mentor")
+            mentor = next((m for m in mentors if m["id"] == mentor_id), None)
+            if not mentor:
+                raise ApiError(404, "That mentor no longer exists.")
+            if op == "remove":
+                mentors.remove(mentor)
+            elif op == "avail":
+                meeting = self._meeting(self.body.get("meetingId"))
+                status = self.body.get("status") or ""
+                if status and status not in AVAIL:
+                    raise ApiError(400, "Bad answer.")
+                if status:
+                    mentor["avail"][meeting["id"]] = {"s": status, "by": "Coach", "at": int(time.time())}
+                else:
+                    mentor["avail"].pop(meeting["id"], None)
+            elif op == "away_add":
+                if len(mentor["away"]) >= MAX_AWAY:
+                    raise ApiError(400, "Remove an old trip first.")
+                mentor["away"].append(self._away_entry("Coach"))
+                mentor["away"].sort(key=lambda a: a["from"])
+            elif op == "away_remove":
+                away_id = self._id(self.body.get("awayId"), "trip")
+                mentor["away"] = [a for a in mentor["away"] if a["id"] != away_id]
+            else:
+                raise ApiError(400, "Bad request.")
+        self._set_json("team:mentors", mentors)
+        self._send(200, {"ok": True, "mentors": mentors})

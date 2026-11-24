@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Team Corner | Mechanical Masters FLL</title>
+  <meta name="description" content="Private team page for the Mechanical Masters FLL team: meeting availability, time away and parent volunteer sign-up.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="fll.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script>document.documentElement.classList.add('js');</script>
+  <meta name="theme-color" content="#05070f">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    .team-page{ padding-top:150px; }
+    .team-page input[type="date"], .team-page input[type="time"], .team-page input[type="number"]{
+      padding:11px 13px; border-radius:12px; border:1px solid rgba(255,255,255,0.14);
+      background:rgba(2,6,23,0.6); color:var(--text); font:inherit; font-size:15px; color-scheme:dark;
+    }
+    .team-page input[type="number"]{ width:70px; }
+    .team-tabs{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 18px; }
+    .team-tab{ padding:10px 16px; border-radius:999px; border:1px solid var(--line); background:rgba(255,255,255,0.04);
+      color:var(--muted); font:inherit; font-weight:700; cursor:pointer; }
+    .team-tab[aria-selected="true"]{ color:#020617; background:var(--fll-green); border-color:var(--fll-green); }
+    .team-form{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:10px 0 4px; }
+    .team-form label{ display:grid; gap:4px; font-size:13px; font-weight:700; color:var(--muted); }
+    .team-form input[type="text"]{ min-width:180px; width:auto; }
+    .team-form select{ width:auto; }
+    .team-meeting{ display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
+      padding:14px 16px; border-radius:16px; border:1px solid var(--line); background:rgba(255,255,255,0.02); margin-bottom:10px; }
+    .team-meeting .when{ font-weight:800; }
+    .team-meeting .where{ color:var(--muted); font-size:14px; }
+    .team-meeting .by{ color:var(--muted); font-size:12px; margin-top:4px; }
+    .team-choice{ display:flex; gap:6px; flex-wrap:wrap; }
+    .team-choice button{ padding:8px 14px; border-radius:999px; border:1px solid var(--line); background:rgba(255,255,255,0.04);
+      color:var(--text); font:inherit; font-weight:700; cursor:pointer; }
+    .team-choice button.on.yes{ background:#22c55e; border-color:#22c55e; color:#020617; }
+    .team-choice button.on.maybe{ background:#f59e0b; border-color:#f59e0b; color:#020617; }
+    .team-choice button.on.no{ background:#ef4444; border-color:#ef4444; color:#fff; }
+    .badge{ display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:800; margin-left:6px; vertical-align:middle; }
+    .badge.proposed{ background:rgba(56,189,248,0.18); color:#7dd3fc; }
+    .badge.scheduled{ background:rgba(163,230,53,0.2); color:var(--fll-green); }
+    .badge.cancelled{ background:rgba(239,68,68,0.2); color:#fca5a5; }
+    .badge.away{ background:rgba(167,139,250,0.22); color:#c4b5fd; }
+    .vol-slot{ display:grid; gap:6px; min-width:220px; }
+    .vol-slot h5{ font-size:14px; display:flex; gap:6px; align-items:center; }
+    .vol-person{ font-size:14px; }
+    .vol-open{ color:var(--muted); font-size:14px; font-style:italic; }
+    .grid-wrap{ overflow-x:auto; }
+    .grid{ border-collapse:collapse; font-size:14px; min-width:100%; }
+    .grid th, .grid td{ padding:8px 6px; border-bottom:1px solid var(--line); text-align:center; white-space:nowrap; }
+    .grid th:first-child, .grid td:first-child{ text-align:left; position:sticky; left:0; background:#070b16; }
+    .grid th{ color:var(--muted); font-size:12px; }
+    .grid tr.sub td{ color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:0.5px; text-align:left; padding-top:16px; }
+    .cell{ display:inline-flex; width:28px; height:28px; border-radius:8px; align-items:center; justify-content:center; font-weight:800; }
+    .cell.yes{ background:#22c55e; color:#020617; }
+    .cell.maybe{ background:#f59e0b; color:#020617; }
+    .cell.no{ background:#ef4444; color:#fff; }
+    .cell.away{ background:#a78bfa; color:#020617; }
+    .cell.none{ background:rgba(255,255,255,0.06); color:var(--muted); }
+    button.cell{ border:0; cursor:pointer; font:inherit; font-weight:800; }
+    .grid tfoot td{ font-weight:800; }
+    .team-legend{ display:flex; flex-wrap:wrap; gap:14px; margin:10px 0; font-size:13px; color:var(--muted); }
+    .team-legend span{ display:inline-flex; align-items:center; gap:6px; }
+    .team-legend .cell{ width:18px; height:18px; font-size:11px; }
+    .ev-name{ font-weight:800; font-size:13px; color:#7dd3fc; }
+    .ev-name.activity{ color:#fbbf24; }
+    .cal-meet .ev-name{ font-size:12px; }
+    .cal-nav{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin:8px 0 12px; }
+    .cal-nav strong{ font-size:18px; }
+    .cal-wrap{ overflow-x:auto; }
+    .cal{ display:grid; grid-template-columns:repeat(7, minmax(120px, 1fr)); gap:4px; min-width:860px; }
+    .cal-head{ text-align:center; font-size:12px; font-weight:800; color:var(--muted); text-transform:uppercase; padding:4px 0; }
+    .cal-day{ min-height:96px; padding:6px; border-radius:10px; border:1px solid var(--line); background:rgba(255,255,255,0.02); }
+    .cal-day.empty{ border:0; background:none; }
+    .cal-day.past{ opacity:0.55; }
+    .cal-day.today{ border-color:var(--fll-green); }
+    .cal-num{ font-size:12px; font-weight:800; color:var(--muted); margin-bottom:4px; }
+    .cal-meet{ border-radius:8px; padding:6px; margin-bottom:4px; font-size:12px; line-height:1.35;
+      background:rgba(56,189,248,0.10); border-left:3px solid #38bdf8; }
+    .cal-meet.scheduled{ background:rgba(163,230,53,0.10); border-left-color:var(--fll-green); }
+    .cal-meet.cancelled{ background:rgba(239,68,68,0.08); border-left-color:#ef4444; text-decoration:line-through; opacity:0.7; }
+    .cal-meet .badge{ margin-left:0; font-size:10px; padding:1px 6px; }
+    .cal-time{ font-weight:800; }
+    .cal-place{ color:var(--muted); }
+    .cal-line{ margin-top:3px; padding:2px 5px; border-radius:6px; }
+    .cal-line.ok{ background:rgba(34,197,94,0.15); }
+    .cal-line.bad{ background:rgba(239,68,68,0.30); color:#fecaca; }
+    .dot{ display:inline-block; width:12px; height:12px; border-radius:4px; }
+    .dot.ok{ background:rgba(34,197,94,0.6); }
+    .dot.bad{ background:rgba(239,68,68,0.8); }
+    .who-pick{ display:grid; gap:12px; margin-top:14px; text-align:left; }
+    .who-row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .who-row .who-role{ font-weight:800; min-width:80px; }
+    .who-row input[type="text"]{ flex:1 1 160px; width:auto; }
+  </style>
+</head>
+
+<body>
+  <div class="noise"></div>
+  <div class="glow glow-one"></div>
+  <div class="glow glow-two"></div>
+
+  <nav class="navbar">
+    <a href="index.html" class="brand">Abhijit Shinde</a>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">HOME</a>
+    </div>
+    <button class="menu-btn" onclick="toggleMenu()">☰</button>
+  </nav>
+
+  <main class="section team-page">
+    <p class="section-label">Mechanical Masters #67741</p>
+    <h1 class="page-title">Team Corner</h1>
+    <div id="teamApp">
+      <noscript><p class="fll-card">This page needs JavaScript turned on.</p></noscript>
+    </div>
+  </main>
+
+  <script src="script.js"></script>
+  <script src="fll-team.js"></script>
+</body>
+</html>

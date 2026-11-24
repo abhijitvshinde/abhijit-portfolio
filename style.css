@@ -714,6 +714,15 @@ footer{
   margin-top:10px;
 }
 
+.footer-team-link a{
+  color:#94a3b8;
+  font-size:13px;
+}
+
+.footer-team-link a:hover{
+  color:#38bdf8;
+}
+
 /* =========================
    PUBLICATIONS PAGE
 ========================= */
