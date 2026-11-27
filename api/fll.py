@@ -11,6 +11,8 @@ One endpoint, routed by ?action=...
            team_avail, team_away also work for the coach with {username} (answer stamped "Coach")
            team_meeting, team_mentor (POST, coach)
            team_public (GET, no login: calendar with counts only, no names)
+  Mentor : (login set by the coach via team_mentor op=login) team (GET), mentor_avail, mentor_away,
+           hours (GET/POST: their volunteer-hours sheet). Coach: hours (GET all), hours_decide.
 
 Required environment variables (set in Vercel -> Project -> Settings -> Environment Variables):
   ADMIN_USERNAME      coach login name
@@ -63,6 +65,7 @@ EVENT_TYPES = {"meeting", "zoo", "fundraiser", "team_visit", "outreach", "compet
 MAX_MEETINGS = 120
 MAX_AWAY = 40
 MAX_MENTORS = 20
+MAX_HOURS = 300
 # Logins that are not real team members (left out of availability counts and grids).
 TEAM_EXCLUDE = {"demo"}
 TEAM_TZ = "America/New_York"
@@ -399,6 +402,11 @@ class handler(BaseHTTPRequestHandler):
                 ("POST", "team_parent"): self.team_parent,
                 ("POST", "team_meeting"): self.team_meeting,
                 ("POST", "team_mentor"): self.team_mentor,
+                ("POST", "mentor_avail"): self.mentor_avail,
+                ("POST", "mentor_away"): self.mentor_away,
+                ("GET", "hours"): self.get_hours,
+                ("POST", "hours"): self.save_hours,
+                ("POST", "hours_decide"): self.hours_decide,
             }
             fn = routes.get((method, action))
             if not fn:
@@ -440,15 +448,32 @@ class handler(BaseHTTPRequestHandler):
         if sess.get("r") == "coach":
             if sess.get("v") != admin_version():
                 raise ApiError(401, "Please log in again.")
-            if role != "coach" and role != "any":
-                raise ApiError(403, "Coach accounts don't play — log in as a student.")
+            if role not in ("coach", "any"):
+                raise ApiError(403, "Coach accounts don't play — log in as a student."
+                               if role != "mentor" else "Mentors only.")
             return sess, None
+        if sess.get("r") == "mentor":
+            # Mentors only use the Team Corner. Never let them reach "any" routes, where
+            # user None means coach.
+            rec = self._get_json("mentoruser:" + sess.get("u", ""))
+            if not rec or rec.get("ver") != sess.get("v"):
+                raise ApiError(401, "Please log in again.")
+            if role != "mentor":
+                raise ApiError(403, "Mentor logins can only use the Team Corner page.")
+            mentor = next((m for m in self._get_json("team:mentors") or [] if m["id"] == rec["mentorId"]), None)
+            if not mentor:
+                raise ApiError(401, "This mentor login was removed. Ask the coach.")
+            return sess, mentor
         user = self._get_json("user:" + sess.get("u", ""))
         if not user or user.get("ver") != sess.get("v"):
             raise ApiError(401, "Please log in again.")
-        if role == "coach":
-            raise ApiError(403, "Coach only.")
+        if role in ("coach", "mentor"):
+            raise ApiError(403, "Coach only." if role == "coach" else "Mentors only.")
         return sess, user
+
+    def _role(self):
+        sess = self._session()
+        return (sess or {}).get("r")
 
     def _public_user(self, user):
         return {"username": user["username"], "name": user["name"], "team": user.get("team", ""), "role": "kid"}
@@ -476,11 +501,18 @@ class handler(BaseHTTPRequestHandler):
                 reply = {"user": {"username": admin_user, "name": "Coach", "role": "coach"}}
         else:
             user = self._get_json("user:" + username)
+            mrec = None if user else self._get_json("mentoruser:" + username)
             if user:
                 _, digest = hash_password(password, user["salt"])
                 if hmac.compare_digest(digest, user["hash"]):
                     payload = {"u": username, "r": "kid", "v": user["ver"]}
                     reply = {"user": self._public_user(user)}
+            elif mrec:
+                _, digest = hash_password(password, mrec["salt"])
+                mentor = next((m for m in self._get_json("team:mentors") or [] if m["id"] == mrec["mentorId"]), None)
+                if mentor and hmac.compare_digest(digest, mrec["hash"]):
+                    payload = {"u": username, "r": "mentor", "v": mrec["ver"]}
+                    reply = {"user": self._mentor_user(username, mentor)}
             else:
                 hash_password(password)  # same timing whether or not the user exists
 
@@ -498,7 +530,13 @@ class handler(BaseHTTPRequestHandler):
     def logout(self):
         self._send(200, {"ok": True}, cookie=self._cookie("", 0))
 
+    def _mentor_user(self, username, mentor):
+        return {"username": username, "name": mentor["name"], "role": "mentor", "mentorId": mentor["id"]}
+
     def me(self):
+        if self._role() == "mentor":
+            sess, mentor = self._require("mentor")
+            return self._send(200, {"user": self._mentor_user(sess["u"], mentor)})
         sess, user = self._require("any")
         if user is None:
             return self._send(200, {"user": {"username": sess["u"], "name": "Coach", "role": "coach"}})
@@ -688,7 +726,7 @@ class handler(BaseHTTPRequestHandler):
             raise ApiError(400, "Usernames are 3-24 letters/numbers (dots, dashes and underscores are OK).")
         if username == os.environ["ADMIN_USERNAME"].strip().lower():
             raise ApiError(400, "That username is taken.")
-        if self._get_json("user:" + username):
+        if self._get_json("user:" + username) or self._get_json("mentoruser:" + username):
             raise ApiError(409, "That username is taken. Try another.")
         salt, digest = hash_password(password)
         user = {
@@ -784,12 +822,48 @@ class handler(BaseHTTPRequestHandler):
         return {"id": secrets.token_hex(4), "from": start, "to": end,
                 "note": clean_text(self.body.get("note"), 80), "by": by, "name": name}
 
+    def _counts(self, meetings):
+        """Per meeting: kids coming (everyone, unless a parent/coach said No or the date is in
+        their time away), maybe, absent; and mentors who said yes / maybe."""
+        names = self._team_members()
+        keys = []
+        for n in names:
+            keys += [PREFIX + "team:avail:" + n, PREFIX + "team:away:" + n]
+        raw = self.store.cmd("MGET", *keys) if keys else []
+        kids = [(json.loads(raw[2 * i]) if raw[2 * i] else {}, json.loads(raw[2 * i + 1]) if raw[2 * i + 1] else [])
+                for i in range(len(names))]
+        mentors = self._get_json("team:mentors") or []
+        out = {}
+        for m in meetings:
+            absent = maybe = 0
+            for avail, away in kids:
+                s = (avail.get(m["id"]) or {}).get("s")
+                if s == "no" or (not s and any(a["from"] <= m["date"] <= a["to"] for a in away)):
+                    absent += 1
+                elif s == "maybe":
+                    maybe += 1
+            ms = [(mt.get("avail", {}).get(m["id"]) or {}).get("s") for mt in mentors]
+            out[m["id"]] = {
+                "kids": {"coming": len(kids) - absent, "maybe": maybe, "absent": absent, "total": len(kids)},
+                "mentors": {"coming": ms.count("yes"), "maybe": ms.count("maybe"), "total": len(mentors)},
+            }
+        return out
+
     def get_team(self):
-        sess, user = self._require("any")
         meetings = self._meetings()
+        if self._role() == "mentor":
+            sess, mentor = self._require("mentor")
+            vol_raw = self.store.cmd("MGET", *[PREFIX + "team:vol:" + m["id"] for m in meetings]) if meetings else []
+            return self._send(200, {
+                "meetings": meetings,
+                "volunteers": {m["id"]: json.loads(v) for m, v in zip(meetings, vol_raw) if v},
+                "counts": self._counts(meetings),
+                "mentor": {"avail": mentor.get("avail", {}), "away": mentor.get("away", [])},
+            })
+        sess, user = self._require("any")
         vol_raw = self.store.cmd("MGET", *[PREFIX + "team:vol:" + m["id"] for m in meetings]) if meetings else []
         volunteers = {m["id"]: json.loads(v) for m, v in zip(meetings, vol_raw) if v}
-        out = {"meetings": meetings, "volunteers": volunteers}
+        out = {"meetings": meetings, "volunteers": volunteers, "counts": self._counts(meetings)}
         if user is not None:
             out["mine"] = {
                 "avail": self._get_json("team:avail:" + sess["u"]) or {},
@@ -889,19 +963,16 @@ class handler(BaseHTTPRequestHandler):
         """No login needed: the calendar shown on the Team Corner login screen.
         Counts only — no kid, parent or volunteer names, and no place or notes."""
         meetings = self._meetings()
-        names = self._team_members()
-        keys = [PREFIX + "team:avail:" + n for n in names] + [PREFIX + "team:vol:" + m["id"] for m in meetings]
-        raw = self.store.cmd("MGET", *keys) if keys else []
-        avails = [json.loads(a) if a else {} for a in raw[:len(names)]]
-        vols = [json.loads(v) if v else {} for v in raw[len(names):]]
+        counts = self._counts(meetings)
+        raw = self.store.cmd("MGET", *[PREFIX + "team:vol:" + m["id"] for m in meetings]) if meetings else []
+        vols = [json.loads(v) if v else {} for v in raw]
         out = []
         for m, vol in zip(meetings, vols):
-            answers = [(a.get(m["id"]) or {}).get("s") for a in avails]
             item = {
                 "id": m["id"], "type": m.get("type", "meeting"), "title": m.get("title", ""),
                 "date": m["date"], "start": m.get("start", ""), "end": m.get("end", ""),
                 "status": m.get("status", "proposed"),
-                "kids": {"yes": answers.count("yes"), "maybe": answers.count("maybe"), "total": len(names)},
+                "kids": counts[m["id"]]["kids"], "mentors": counts[m["id"]]["mentors"],
             }
             if item["status"] == "scheduled":
                 slots = m.get("slots") or {}
@@ -1080,6 +1151,27 @@ class handler(BaseHTTPRequestHandler):
                 raise ApiError(404, "That mentor no longer exists.")
             if op == "remove":
                 mentors.remove(mentor)
+                keys = [PREFIX + "team:hours:" + mentor["id"]]
+                if mentor.get("login"):
+                    keys.append(PREFIX + "mentoruser:" + mentor["login"])
+                self.store.cmd("DEL", *keys)
+            elif op == "login":
+                # Coach sets (or resets) the mentor's username and password.
+                username = clean_text(self.body.get("username"), 24).lower()
+                password = self._new_password()
+                if not USERNAME_RE.match(username):
+                    raise ApiError(400, "Usernames are 3-24 letters/numbers (dots, dashes and underscores are OK).")
+                other = self._get_json("mentoruser:" + username)
+                if (username == os.environ["ADMIN_USERNAME"].strip().lower() or self._get_json("user:" + username)
+                        or (other and other.get("mentorId") != mentor["id"])):
+                    raise ApiError(409, "That username is taken. Try another.")
+                if mentor.get("login") and mentor["login"] != username:
+                    self.store.cmd("DEL", PREFIX + "mentoruser:" + mentor["login"])
+                salt, digest = hash_password(password)
+                self._set_json("mentoruser:" + username, {
+                    "username": username, "mentorId": mentor["id"], "salt": salt, "hash": digest,
+                    "ver": secrets.token_hex(4), "created": int(time.time())})
+                mentor["login"] = username
             elif op == "avail":
                 meeting = self._meeting(self.body.get("meetingId"))
                 status = self.body.get("status") or ""
@@ -1101,3 +1193,107 @@ class handler(BaseHTTPRequestHandler):
                 raise ApiError(400, "Bad request.")
         self._set_json("team:mentors", mentors)
         self._send(200, {"ok": True, "mentors": mentors})
+
+    # --- mentor login: their own availability, time away and volunteer hours
+
+    def _save_mentor(self, mentor):
+        mentors = self._get_json("team:mentors") or []
+        for i, m in enumerate(mentors):
+            if m["id"] == mentor["id"]:
+                mentors[i] = mentor
+        self._set_json("team:mentors", mentors)
+
+    def mentor_avail(self):
+        """Mentor: {meetingId, status: yes|maybe|no|''}."""
+        _, mentor = self._require("mentor")
+        meeting = self._meeting(self.body.get("meetingId"))
+        status = self.body.get("status") or ""
+        if status and status not in AVAIL:
+            raise ApiError(400, "Bad answer.")
+        mentor.setdefault("avail", {})
+        if status:
+            mentor["avail"][meeting["id"]] = {"s": status, "by": mentor["name"], "at": int(time.time())}
+        else:
+            mentor["avail"].pop(meeting["id"], None)
+        self._save_mentor(mentor)
+        self._send(200, {"ok": True, "avail": mentor["avail"]})
+
+    def mentor_away(self):
+        """Mentor: {op: add, from, to, note} or {op: remove, id}."""
+        _, mentor = self._require("mentor")
+        away = mentor.setdefault("away", [])
+        op = self.body.get("op")
+        if op == "add":
+            if len(away) >= MAX_AWAY:
+                raise ApiError(400, "Remove an old trip first.")
+            away.append(self._away_entry(mentor["name"]))
+            away.sort(key=lambda a: a["from"])
+        elif op == "remove":
+            away_id = self._id(self.body.get("id"), "trip")
+            mentor["away"] = [a for a in away if a["id"] != away_id]
+        else:
+            raise ApiError(400, "Bad request.")
+        self._save_mentor(mentor)
+        self._send(200, {"ok": True, "away": mentor["away"]})
+
+    def get_hours(self):
+        """Mentor: their own hours sheet. Coach: every mentor's sheet."""
+        if self._role() == "mentor":
+            _, mentor = self._require("mentor")
+            return self._send(200, {"sheets": [{"id": mentor["id"], "name": mentor["name"],
+                                                "hours": self._get_json("team:hours:" + mentor["id"]) or []}]})
+        self._require("coach")
+        mentors = self._get_json("team:mentors") or []
+        raw = self.store.cmd("MGET", *[PREFIX + "team:hours:" + m["id"] for m in mentors]) if mentors else []
+        self._send(200, {"sheets": [{"id": m["id"], "name": m["name"], "hours": json.loads(r) if r else []}
+                                    for m, r in zip(mentors, raw)]})
+
+    def save_hours(self):
+        """Mentor: {op: add, date, start, end, note} or {op: remove, id} (only while still pending)."""
+        _, mentor = self._require("mentor")
+        key = "team:hours:" + mentor["id"]
+        hours = self._get_json(key) or []
+        op = self.body.get("op")
+        if op == "add":
+            if len(hours) >= MAX_HOURS:
+                raise ApiError(400, "The sheet is full. Ask the coach to clear old entries.")
+            day = self._date(self.body.get("date"))
+            start, end = self._time(self.body.get("start")), self._time(self.body.get("end"))
+            if not start or not end:
+                raise ApiError(400, "Pick the start and end time.")
+            if end <= start:
+                raise ApiError(400, "The end time must be after the start time.")
+            if day > time.strftime("%Y-%m-%d", time.gmtime(time.time() + 86400)):
+                raise ApiError(400, "You can only log hours you have already volunteered.")
+            (h1, m1), (h2, m2) = map(int, start.split(":")), map(int, end.split(":"))
+            hours.append({"id": secrets.token_hex(4), "date": day, "start": start, "end": end,
+                          "hours": round(((h2 * 60 + m2) - (h1 * 60 + m1)) / 60, 2),
+                          "note": clean_text(self.body.get("note"), 80), "status": "pending", "at": int(time.time())})
+            hours.sort(key=lambda e: (e["date"], e["start"]))
+        elif op == "remove":
+            entry_id = self._id(self.body.get("id"), "entry")
+            entry = next((e for e in hours if e["id"] == entry_id), None)
+            if entry and entry["status"] != "pending":
+                raise ApiError(400, "The coach already checked this entry, so it can't be removed.")
+            hours = [e for e in hours if e["id"] != entry_id]
+        else:
+            raise ApiError(400, "Bad request.")
+        self._set_json(key, hours)
+        self._send(200, {"ok": True, "hours": hours})
+
+    def hours_decide(self):
+        """Coach: {mentorId, id, status: approved|rejected|pending}."""
+        self._require("coach")
+        mentor_id = self._id(self.body.get("mentorId"), "mentor")
+        status = self.body.get("status")
+        if status not in ("approved", "rejected", "pending"):
+            raise ApiError(400, "Bad status.")
+        key = "team:hours:" + mentor_id
+        hours = self._get_json(key) or []
+        entry = next((e for e in hours if e["id"] == self._id(self.body.get("id"), "entry")), None)
+        if not entry:
+            raise ApiError(404, "That entry no longer exists.")
+        entry["status"] = status
+        entry["decidedAt"] = int(time.time()) if status != "pending" else None
+        self._set_json(key, hours)
+        self._send(200, {"ok": True, "hours": hours})

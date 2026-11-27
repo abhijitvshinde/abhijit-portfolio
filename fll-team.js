@@ -142,11 +142,17 @@
     render();
   }
 
+  // Answers that change the calendar's "kids / mentors coming" numbers (counted on the server).
+  const COUNT_ACTIONS = new Set(["team_avail", "team_away", "team_mentor", "mentor_avail", "mentor_away", "team_meeting"]);
+
   async function act(action, body, after) {
     try {
       const res = await api(action, { method: "POST", body });
-      if (after) after(res);
       state.msg = "";
+      if (after) after(res);
+      if (COUNT_ACTIONS.has(action) && state.data) {
+        try { state.data.counts = (await api("team")).counts; } catch (e) { /* keep old numbers */ }
+      }
     } catch (err) {
       state.msg = err.message;
       if (err.status === 401) { state.user = null; }
@@ -187,14 +193,14 @@
         }
       }
     },
-      h("label", { for: "tUser" }, "Your child's username"), user,
+      h("label", { for: "tUser" }, "Username (your child's, or your mentor login)"), user,
       h("label", { for: "tPass" }, "Password"), pass,
       btn, msg
     );
     if (compact) {
       return h("div", { class: "fll-card team-login-mini" },
-        h("h3", {}, icon("fa-right-to-bracket"), " Parents & team login"),
-        h("p", { class: "fll-muted small" }, "Use your child's FLL login to answer meetings, add vacations and volunteer."),
+        h("h3", {}, icon("fa-right-to-bracket"), " Parents, mentors & coach"),
+        h("p", { class: "fll-muted small" }, "Parents: use your child's FLL login. Mentors: use the login the coach gave you."),
         form);
     }
     return h("div", { class: "fll-login" },
@@ -248,7 +254,8 @@
   async function startSession(user) {
     state.user = user;
     state.tab = user.role === "coach" ? "calendar" : "meetings";
-    if (user.role !== "coach") {
+    state.hours = null;
+    if (user.role === "kid") {
       let saved = null;
       try { saved = localStorage.getItem(PARENT_KEY + user.username); } catch (e) { /* private mode */ }
       state.parent = saved === "mother" || saved === "father" ? saved : null;
@@ -274,6 +281,8 @@
   function header() {
     const badge = state.user.role === "coach"
       ? h("span", { class: "fll-who" }, icon("fa-clipboard-user"), " Coach")
+      : state.user.role === "mentor"
+      ? h("span", { class: "fll-who" }, icon("fa-user-tie"), " ", state.user.name, " ", h("small", {}, "· Mentor"))
       : h("span", { class: "fll-who" }, icon("fa-user"), " ", state.user.name, " ",
         h("small", {}, "· filled in by ", who({ name: myParents()[state.parent], by: state.parent === "mother" ? "Mother" : "Father" }), " "),
         h("button", { class: "fll-link-btn", type: "button", onclick: () => { state.parent = null; render(); } }, "change"));
@@ -286,7 +295,7 @@
     return h("div", { class: "team-tabs", role: "tablist" },
       list.map(([id, label, ic]) => h("button", {
         class: "team-tab", type: "button", role: "tab", "aria-selected": state.tab === id ? "true" : "false",
-        onclick: () => { state.tab = id; state.msg = ""; render(); }
+        onclick: () => { state.tab = id; state.msg = ""; if (id === "hours") state.hours = null; render(); }
       }, icon(ic), " ", label)));
   }
 
@@ -441,6 +450,163 @@
     return card;
   }
 
+  /* ---------- mentor (own login) views ---------- */
+
+  function viewMentorMeetings() {
+    const me = state.data.mentor;
+    const list = visibleMeetings(false);
+    const card = h("div", { class: "fll-card" },
+      h("h3", {}, icon("fa-calendar-check"), " Can you come?"),
+      h("p", { class: "fll-muted" }, "Say Yes for the sessions you can volunteer at, so the coach (and families) can see how many mentors will be there."),
+      pastToggle());
+    if (!list.length) card.append(h("p", { class: "fll-muted" }, "No meeting dates yet."));
+    for (const m of list) {
+      const ans = me.avail[m.id];
+      card.append(h("div", { class: "team-meeting" },
+        h("div", {}, meetingTitle(m),
+          isAway(me.away, m.date) ? h("span", { class: "badge away" }, icon("fa-plane"), " You marked time away") : null,
+          ans && ans.by === "Coach" ? h("div", { class: "by" }, "Set by the coach") : null),
+        h("div", { class: "team-choice" },
+          ANSWERS.map((a) => h("button", {
+            type: "button", class: a.id + (ans && ans.s === a.id ? " on" : ""),
+            "aria-pressed": ans && ans.s === a.id ? "true" : "false",
+            onclick: () => act("mentor_avail", { meetingId: m.id, status: ans && ans.s === a.id ? "" : a.id },
+              (r) => { me.avail = r.avail; })
+          }, a.label)))));
+    }
+    return card;
+  }
+
+  function viewMentorAway() {
+    const me = state.data.mentor;
+    return h("div", { class: "fll-card" },
+      h("h3", {}, icon("fa-plane"), " Time away"),
+      h("p", { class: "fll-muted" }, "Add dates you can't make it (exams, trips, holidays)."),
+      awayForm((v) => act("mentor_away", { op: "add", ...v }, (r) => { me.away = r.away; })),
+      awayList(me.away, (a) => act("mentor_away", { op: "remove", id: a.id }, (r) => { me.away = r.away; })));
+  }
+
+  /* ---------- volunteer hours (mentor: own sheet; coach: everyone's, approve / reject) ---------- */
+
+  const STATUS_LABEL = { pending: "Waiting for coach", approved: "Approved", rejected: "Rejected" };
+  const fmtHours = (n) => (Math.round(n * 100) / 100).toString();
+
+  async function loadHours() {
+    try { state.hours = (await api("hours")).sheets; } catch (err) { state.msg = err.message; state.hours = []; }
+    render();
+  }
+
+  function viewHours() {
+    const isCoach = state.user.role === "coach";
+    if (!state.hours) { loadHours(); return h("p", { class: "fll-muted" }, "Loading…"); }
+    const wrap = h("div", {});
+    if (isCoach) {
+      wrap.append(h("div", { class: "fll-card" },
+        h("h3", {}, icon("fa-clock"), " Mentor volunteer hours"),
+        h("p", { class: "fll-muted" }, "Mentors log their hours after each session. Approve or reject each entry, then download the sheet as a PDF to submit.")));
+      if (!state.hours.length) wrap.append(h("p", { class: "fll-muted" }, "No mentors yet. Add them on the Mentors tab."));
+    }
+    for (const sheet of state.hours) wrap.append(hoursSheet(sheet, isCoach));
+    return wrap;
+  }
+
+  function hoursSheet(sheet, isCoach) {
+    const setHours = (r) => { sheet.hours = r.hours; };
+    const approved = sheet.hours.filter((e) => e.status === "approved").reduce((s, e) => s + e.hours, 0);
+    const pending = sheet.hours.filter((e) => e.status === "pending").length;
+    const card = h("div", { class: "fll-card" },
+      h("div", { class: "hours-head" },
+        h("h3", {}, icon("fa-user-tie"), " ", sheet.name),
+        h("button", { class: "btn primary fll-small-btn", type: "button", onclick: () => downloadSheetPdf(sheet) },
+          icon("fa-file-pdf"), " Download PDF")),
+      h("p", { class: "fll-muted small" }, "Approved: ", h("strong", {}, fmtHours(approved) + " h"),
+        pending ? " · " + pending + " waiting for the coach" : ""));
+    if (!isCoach) {
+      const date = h("input", { type: "date", required: true, value: today() });
+      const start = h("input", { type: "time", required: true });
+      const end = h("input", { type: "time", required: true });
+      const note = h("input", { type: "text", maxlength: "80", placeholder: "e.g. Robot build session" });
+      card.append(h("form", {
+        class: "team-form",
+        onsubmit: (e) => {
+          e.preventDefault();
+          act("hours", { op: "add", date: date.value, start: start.value, end: end.value, note: note.value }, setHours);
+        }
+      }, h("label", {}, "Date", date), h("label", {}, "Start", start), h("label", {}, "End", end),
+        h("label", {}, "What you did (optional)", note),
+        h("button", { class: "btn primary fll-small-btn", type: "submit" }, icon("fa-plus"), " Log hours")));
+    }
+    if (!sheet.hours.length) {
+      card.append(h("p", { class: "fll-muted" }, isCoach ? "No hours logged yet." : "No hours logged yet. Add your first session above."));
+      return card;
+    }
+    const rows = sheet.hours.map((e, i) => h("tr", {},
+      h("td", {}, i + 1), h("td", {}, sheet.name), h("td", {}, shortDate(e.date)),
+      h("td", {}, niceTime(e.start)), h("td", {}, niceTime(e.end)), h("td", {}, fmtHours(e.hours)),
+      h("td", { class: "hours-note" }, e.note || ""),
+      h("td", {}, h("span", { class: "badge " + ({ approved: "scheduled", rejected: "cancelled" }[e.status] || "proposed") }, STATUS_LABEL[e.status])),
+      h("td", {}, isCoach
+        ? h("span", { class: "hours-actions" },
+          e.status !== "approved" ? h("button", { class: "fll-tool-btn", type: "button",
+            onclick: () => act("hours_decide", { mentorId: sheet.id, id: e.id, status: "approved" }, setHours) }, icon("fa-check"), " Approve") : null,
+          e.status !== "rejected" ? h("button", { class: "fll-tool-btn", type: "button",
+            onclick: () => act("hours_decide", { mentorId: sheet.id, id: e.id, status: "rejected" }, setHours) }, icon("fa-xmark"), " Reject") : null,
+          e.status !== "pending" ? h("button", { class: "fll-link-btn", type: "button",
+            onclick: () => act("hours_decide", { mentorId: sheet.id, id: e.id, status: "pending" }, setHours) }, "undo") : null)
+        : e.status === "pending"
+          ? h("button", { class: "fll-link-btn", type: "button",
+            onclick: () => act("hours", { op: "remove", id: e.id }, setHours) }, "remove")
+          : "")));
+    card.append(h("div", { class: "grid-wrap" }, h("table", { class: "grid hours-table" },
+      h("thead", {}, h("tr", {}, ["Sr. No.", "Name", "Date", "Start", "End", "Hours", "Note", "Coach", ""].map((t) => h("th", {}, t)))),
+      h("tbody", {}, rows))));
+    return card;
+  }
+
+  // PDF: jsPDF + AutoTable from cdnjs, loaded only when someone downloads a sheet.
+  let pdfLibs = null;
+  function loadScript(src) {
+    return new Promise((ok, fail) => {
+      const s = document.createElement("script");
+      s.src = src; s.onload = ok; s.onerror = () => fail(new Error("Could not load the PDF tool. Check your internet and try again."));
+      document.head.append(s);
+    });
+  }
+  async function downloadSheetPdf(sheet) {
+    try {
+      pdfLibs = pdfLibs || loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js")
+        .then(() => loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"));
+      await pdfLibs;
+    } catch (err) { pdfLibs = null; flash(err.message); return; }
+    const doc = new window.jspdf.jsPDF({ unit: "pt", format: "letter" });
+    const W = doc.internal.pageSize.getWidth();
+    doc.setFont("helvetica", "bold"); doc.setFontSize(20);
+    doc.text(sheet.name, W / 2, 56, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(12);
+    doc.text("Mentor Volunteer Hours", W / 2, 76, { align: "center" });
+    doc.setFontSize(10);
+    doc.text("Mechanical Masters FLL Team #67741  ·  Printed " + niceDate(today()), W / 2, 92, { align: "center" });
+    const approved = sheet.hours.filter((e) => e.status === "approved").reduce((s, e) => s + e.hours, 0);
+    doc.autoTable({
+      startY: 110,
+      head: [["Sr. No.", "Name", "Date of volunteering", "Start time", "End time", "Total hours", "Coach approval"]],
+      body: sheet.hours.map((e, i) => [i + 1, sheet.name, shortDate(e.date) + ", " + e.date.slice(0, 4), niceTime(e.start), niceTime(e.end),
+        fmtHours(e.hours), e.status === "approved" ? "Approved" : e.status === "rejected" ? "Rejected" : "Pending"]),
+      foot: [["", "", "", "", "Total approved", fmtHours(approved), ""]],
+      theme: "grid",
+      styles: { fontSize: 10, cellPadding: 5 },
+      headStyles: { fillColor: [22, 101, 52], textColor: 255 },
+      footStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: "bold" },
+      columnStyles: { 0: { halign: "center", cellWidth: 44 }, 5: { halign: "center" }, 6: { halign: "center" } }
+    });
+    let y = doc.lastAutoTable.finalY + 48;
+    if (y > doc.internal.pageSize.getHeight() - 60) { doc.addPage(); y = 80; }
+    doc.setFontSize(11);
+    doc.text("Coach signature: ______________________________", 40, y);
+    doc.text("Date: ______________", W - 190, y);
+    doc.save(sheet.name.replace(/[^A-Za-z0-9]+/g, "_") + "_volunteer_hours.pdf");
+  }
+
   /* ---------- coach views ---------- */
 
   // Add form (m = null) or edit form pre-filled from meeting m.
@@ -560,8 +726,10 @@
       })));
     }
     const count = (who, m) => who.filter((p) => (p.avail[m.id] || {}).s === "yes").length;
+    const kc = (m) => ((state.data.counts || {})[m.id] || {}).kids || { coming: 0, total: kids.length };
     const foot = h("tfoot", {},
-      h("tr", {}, h("td", {}, "Kids saying yes"), meetings.map((m) => h("td", {}, count(kids, m) + "/" + kids.length))),
+      h("tr", {}, h("td", { title: "Everyone counts as coming unless they said No or are away" }, "Kids coming"),
+        meetings.map((m) => h("td", {}, kc(m).coming + "/" + kc(m).total))),
       h("tr", {}, h("td", {}, "Mentors saying yes"), meetings.map((m) => h("td", {}, count(mentors, m) + "/" + mentors.length))));
     card.append(h("div", { class: "grid-wrap" }, h("table", { class: "grid" }, h("thead", {}, head), body, foot)));
     return card;
@@ -571,7 +739,7 @@
     const name = h("input", { type: "text", maxlength: "40", placeholder: "Mentor's name", required: true });
     const card = h("div", { class: "fll-card" },
       h("h3", {}, icon("fa-user-tie"), " Mentors"),
-      h("p", { class: "fll-muted" }, "Mentors don't have logins. Add them here, add their time away, and set their answers on the Availability tab."),
+      h("p", { class: "fll-muted" }, "Add mentors, then give each one a login (username + password) so they can say which sessions they'll volunteer at, add time away, and log their volunteer hours on this same page. You can still set their answers yourself on the Availability tab."),
       h("form", {
         class: "team-form",
         onsubmit: (e) => { e.preventDefault(); act("team_mentor", { op: "add", name: name.value }, (r) => { state.data.mentors = r.mentors; }); }
@@ -583,11 +751,31 @@
             h("button", { class: "fll-link-btn", type: "button", onclick: () => {
               if (confirm("Remove mentor " + mt.name + "?")) act("team_mentor", { op: "remove", id: mt.id }, (r) => { state.data.mentors = r.mentors; });
             } }, "remove")),
+          mentorLoginForm(mt),
           h("div", { class: "fll-sub" }, "Time away"),
           awayForm((v) => act("team_mentor", { op: "away_add", id: mt.id, ...v }, (r) => { state.data.mentors = r.mentors; })),
           awayList(mt.away, (a) => act("team_mentor", { op: "away_remove", id: mt.id, awayId: a.id }, (r) => { state.data.mentors = r.mentors; })))));
     }
     return card;
+  }
+
+  function mentorLoginForm(mt) {
+    const user = h("input", { type: "text", maxlength: "24", autocomplete: "off", autocapitalize: "none", spellcheck: "false",
+      value: mt.login || mt.name.toLowerCase().replace(/[^a-z0-9._-]/g, ""), "aria-label": mt.name + " username" });
+    const pass = h("input", { type: "text", maxlength: "64", autocomplete: "new-password", placeholder: "6+ characters",
+      "aria-label": mt.name + " password" });
+    return h("div", {},
+      h("div", { class: "fll-sub" }, "Login ",
+        mt.login ? h("span", { class: "badge scheduled" }, icon("fa-key"), " ", mt.login) : h("span", { class: "badge proposed" }, "no login yet")),
+      h("form", {
+        class: "team-form",
+        onsubmit: (e) => {
+          e.preventDefault();
+          act("team_mentor", { op: "login", id: mt.id, username: user.value, password: pass.value },
+            (r) => { state.data.mentors = r.mentors; flash("Login saved for " + mt.name + ". Give them the username and password."); });
+        }
+      }, h("label", {}, "Username", user), h("label", {}, mt.login ? "New password" : "Password", pass),
+        h("button", { class: "btn primary fll-small-btn", type: "submit" }, icon("fa-key"), mt.login ? " Reset password" : " Create login")));
   }
 
   function viewCoachAway() {
@@ -689,6 +877,15 @@
       note);
   }
 
+  // Kids are counted as coming unless a parent/coach said No or the date is in their time away.
+  function kidsLine(k) {
+    const extra = [k.absent ? k.absent + " absent" : "", k.maybe ? k.maybe + " maybe" : ""].filter(Boolean).join(", ");
+    return calLine(k.coming > 0, "Kids", k.coming + "/" + k.total + " coming" + (extra ? " (" + extra + ")" : ""));
+  }
+  function mentorsLine(mc) {
+    return calLine(mc.coming > 0, "Mentors", mc.coming + " coming" + (mc.maybe ? ", " + mc.maybe + " maybe" : ""));
+  }
+
   function calLine(ok, label, text) {
     return h("div", { class: "cal-line " + (ok ? "ok" : "bad") }, h("b", {}, label + ": "), text);
   }
@@ -705,8 +902,8 @@
   function calMeetingPublic(m) {
     const box = calBox(m);
     if (m.status === "cancelled") return box;
-    const k = m.kids || { yes: 0, maybe: 0 };
-    box.append(calLine(k.yes > 0, "Kids", k.yes + " coming" + (k.maybe ? ", " + k.maybe + " maybe" : "")));
+    if (m.kids) box.append(kidsLine(m.kids));
+    if (m.mentors) box.append(mentorsLine(m.mentors));
     for (const [kind, v] of Object.entries(m.volunteers || {})) {
       if (kind === "present") {
         const gaps = v.gaps || [];
@@ -726,15 +923,18 @@
     const box = calBox(m);
     if (m.status === "cancelled") return box;
 
-    if (isCoach) {
-      const { kids, mentors } = state.data;
-      const kidYes = kids.filter((k) => (k.avail[m.id] || {}).s === "yes").length;
-      const kidAway = kids.filter((k) => !k.avail[m.id] && isAway(k.away, m.date)).length;
-      box.append(calLine(kidYes > 0, "Kids", kidYes + "/" + kids.length + " yes" + (kidAway ? ", " + kidAway + " away" : "")));
-      const mYes = mentors.filter((mt) => (mt.avail[m.id] || {}).s === "yes").map((mt) => mt.name);
-      const mMaybe = mentors.filter((mt) => (mt.avail[m.id] || {}).s === "maybe").map((mt) => mt.name + "?");
-      box.append(calLine(mYes.length > 0, "Mentors",
-        mYes.length || mMaybe.length ? mYes.concat(mMaybe).join(", ") : "none available"));
+    const c = (state.data.counts || {})[m.id];
+    if (c) {
+      box.append(kidsLine(c.kids));
+      if (isCoach) {
+        const mentors = state.data.mentors;
+        const mYes = mentors.filter((mt) => (mt.avail[m.id] || {}).s === "yes").map((mt) => mt.name);
+        const mMaybe = mentors.filter((mt) => (mt.avail[m.id] || {}).s === "maybe").map((mt) => mt.name + "?");
+        box.append(calLine(mYes.length > 0, "Mentors",
+          mYes.length || mMaybe.length ? mYes.length + " coming: " + mYes.concat(mMaybe).join(", ") : "none yet"));
+      } else {
+        box.append(mentorsLine(c.mentors));
+      }
     }
     if (m.status === "scheduled") {
       const vol = state.data.volunteers[m.id] || {};
@@ -768,7 +968,7 @@
       else root.append(viewLogin());
       return;
     }
-    if (state.user.role !== "coach" && (!state.parent || !myParents()[state.parent])) {
+    if (state.user.role === "kid" && (!state.parent || !myParents()[state.parent])) {
       root.append(state.data ? viewWhoAreYou() : h("p", { class: "fll-muted" }, "Loading…"));
       return;
     }
@@ -779,13 +979,19 @@
     if (state.user.role === "coach") {
       root.append(tabs([["calendar", "Calendar", "fa-calendar-days"], ["plan", "Plan meetings", "fa-calendar-plus"],
         ["grid", "Availability", "fa-table-cells"], ["away", "Time away", "fa-plane"], ["mentors", "Mentors", "fa-user-tie"],
-        ["volunteers", "Volunteers", "fa-handshake-angle"]]));
-      const views = { calendar: viewCalendar, plan: viewCoachPlan, grid: viewCoachGrid, away: viewCoachAway, mentors: viewCoachMentors, volunteers: () => viewVolunteers(false) };
+        ["hours", "Mentor hours", "fa-clock"], ["volunteers", "Volunteers", "fa-handshake-angle"]]));
+      const views = { calendar: () => viewCalendar(), plan: viewCoachPlan, grid: viewCoachGrid, away: viewCoachAway, mentors: viewCoachMentors,
+        hours: viewHours, volunteers: () => viewVolunteers(false) };
       root.append((views[state.tab] || viewCoachPlan)());
+    } else if (state.user.role === "mentor") {
+      root.append(tabs([["meetings", "Meetings", "fa-calendar-check"], ["calendar", "Calendar", "fa-calendar-days"],
+        ["away", "Time away", "fa-plane"], ["hours", "My volunteer hours", "fa-clock"]]));
+      const views = { meetings: viewMentorMeetings, calendar: () => viewCalendar(), away: viewMentorAway, hours: viewHours };
+      root.append((views[state.tab] || viewMentorMeetings)());
     } else {
       root.append(tabs([["meetings", "Meetings", "fa-calendar-check"], ["calendar", "Calendar", "fa-calendar-days"],
         ["away", "Vacations", "fa-plane"], ["volunteers", "Volunteer", "fa-handshake-angle"]]));
-      const views = { meetings: viewParentMeetings, calendar: viewCalendar, away: viewParentAway, volunteers: () => viewVolunteers(true) };
+      const views = { meetings: viewParentMeetings, calendar: () => viewCalendar(), away: viewParentAway, volunteers: () => viewVolunteers(true) };
       root.append((views[state.tab] || viewParentMeetings)());
     }
   }
