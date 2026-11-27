@@ -9,6 +9,7 @@ One endpoint, routed by ?action=...
   Team page (/fll-team.html, kid logins used by parents):
            team (GET), team_avail, team_away, team_volunteer, team_parent (POST, kid)
            team_meeting, team_mentor (POST, coach)
+           team_public (GET, no login: calendar with counts only, no names)
 
 Required environment variables (set in Vercel -> Project -> Settings -> Environment Variables):
   ADMIN_USERNAME      coach login name
@@ -354,6 +355,7 @@ class handler(BaseHTTPRequestHandler):
                 ("POST", "robot"): self.save_robot,
                 ("POST", "robot_score"): self.save_robot_score,
                 ("GET", "team"): self.get_team,
+                ("GET", "team_public"): self.team_public,
                 ("POST", "team_avail"): self.team_avail,
                 ("POST", "team_away"): self.team_away,
                 ("POST", "team_volunteer"): self.team_volunteer,
@@ -780,6 +782,31 @@ class handler(BaseHTTPRequestHandler):
         out["kids"] = kids
         out["mentors"] = self._get_json("team:mentors") or []
         self._send(200, out)
+
+    def team_public(self):
+        """No login needed: the calendar shown on the Team Corner login screen.
+        Counts only — no kid, parent or volunteer names, and no place or notes."""
+        meetings = self._meetings()
+        names = sorted(self.store.cmd("SMEMBERS", PREFIX + "users") or [])
+        keys = [PREFIX + "team:avail:" + n for n in names] + [PREFIX + "team:vol:" + m["id"] for m in meetings]
+        raw = self.store.cmd("MGET", *keys) if keys else []
+        avails = [json.loads(a) if a else {} for a in raw[:len(names)]]
+        vols = [json.loads(v) if v else {} for v in raw[len(names):]]
+        out = []
+        for m, vol in zip(meetings, vols):
+            answers = [(a.get(m["id"]) or {}).get("s") for a in avails]
+            item = {
+                "id": m["id"], "type": m.get("type", "meeting"), "title": m.get("title", ""),
+                "date": m["date"], "start": m.get("start", ""), "end": m.get("end", ""),
+                "status": m.get("status", "proposed"),
+                "kids": {"yes": answers.count("yes"), "maybe": answers.count("maybe"), "total": len(names)},
+            }
+            if item["status"] == "scheduled":
+                slots = m.get("slots") or {}
+                item["volunteers"] = {k: {"filled": len(vol.get(k) or []), "slots": int(slots.get(k, 1))}
+                                      for k in sorted(VOLUNTEER_KINDS)}
+            out.append(item)
+        self._send(200, {"meetings": out})
 
     def team_avail(self):
         """Kid login (used by a parent): {meetingId, status: yes|maybe|no|'', parent}."""

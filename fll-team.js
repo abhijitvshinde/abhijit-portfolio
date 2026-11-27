@@ -33,7 +33,7 @@
   ];
   const PARENT_KEY = "fllTeamParent:";
 
-  const state = { user: null, parent: null, data: null, tab: null, showPast: false, msg: "", calMonth: null };
+  const state = { user: null, parent: null, data: null, pub: null, tab: null, showPast: false, msg: "", calMonth: null };
 
   /* ---------- helpers ---------- */
 
@@ -240,7 +240,13 @@
     state.data = null;
     state.parent = null;
     state.msg = "";
+    await loadPublic();
     render();
+  }
+
+  // Calendar for visitors who are not logged in (counts only).
+  async function loadPublic() {
+    try { state.pub = (await api("team_public")).meetings; } catch (e) { state.pub = null; }
   }
 
   function header() {
@@ -521,11 +527,13 @@
 
   /* ---------- calendar (coach: full picture; parents: meetings + volunteers) ---------- */
 
-  function viewCalendar() {
-    const isCoach = state.user.role === "coach";
+  // pub = true: the no-login calendar on the login screen (counts only, from team_public).
+  function viewCalendar(pub) {
+    const isCoach = !pub && state.user.role === "coach";
+    const meetings = pub ? state.pub : state.data.meetings;
     const t = today();
     if (!state.calMonth) {
-      const next = state.data.meetings.find((m) => m.date >= t && m.status !== "cancelled");
+      const next = meetings.find((m) => m.date >= t && m.status !== "cancelled");
       state.calMonth = (next ? next.date : t).slice(0, 7);
     }
     const [y, mo] = state.calMonth.split("-").map(Number);
@@ -537,8 +545,10 @@
     const monthName = new Date(y, mo - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
     const card = h("div", { class: "fll-card" },
-      h("h3", {}, icon("fa-calendar-days"), " Calendar"),
-      isCoach
+      h("h3", {}, icon("fa-calendar-days"), pub ? " Team calendar" : " Calendar"),
+      pub
+        ? h("p", { class: "fll-muted small" }, "Upcoming meetings and activities, how many kids are coming, and which volunteer spots are filled. Log in below to answer or sign up.")
+        : isCoach
         ? h("div", { class: "team-legend" },
           h("span", {}, h("span", { class: "dot ok" }), "Covered"),
           h("span", {}, h("span", { class: "dot bad" }), "Red = nobody available / spot still open"))
@@ -549,7 +559,7 @@
         h("button", { class: "fll-tool-btn", type: "button", onclick: shift(1), "aria-label": "Next month" }, icon("fa-chevron-right"))));
 
     const byDate = {};
-    for (const m of state.data.meetings) (byDate[m.date] = byDate[m.date] || []).push(m);
+    for (const m of meetings) (byDate[m.date] = byDate[m.date] || []).push(m);
 
     const grid = h("div", { class: "cal" });
     for (const d of ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]) grid.append(h("div", { class: "cal-head" }, d));
@@ -560,7 +570,7 @@
       const iso = state.calMonth + "-" + String(day).padStart(2, "0");
       const cell = h("div", { class: "cal-day" + (iso === t ? " today" : "") + (iso < t ? " past" : "") },
         h("div", { class: "cal-num" }, day));
-      for (const m of byDate[iso] || []) cell.append(calMeeting(m, isCoach));
+      for (const m of byDate[iso] || []) cell.append(pub ? calMeetingPublic(m) : calMeeting(m, isCoach));
       grid.append(cell);
     }
     card.append(h("div", { class: "cal-wrap" }, grid));
@@ -571,12 +581,31 @@
     return h("div", { class: "cal-line " + (ok ? "ok" : "bad") }, h("b", {}, label + ": "), text);
   }
 
-  function calMeeting(m, isCoach) {
-    const box = h("div", { class: "cal-meet " + m.status },
+  function calBox(m) {
+    return h("div", { class: "cal-meet " + m.status },
       h("div", { class: "ev-name" + (m.type && m.type !== "meeting" ? " activity" : "") }, icon(typeOf(m).icon), " ", eventName(m)),
       h("div", { class: "cal-time" }, timeRange(m), " ",
         h("span", { class: "badge " + m.status }, m.status === "scheduled" ? "Confirmed" : m.status === "cancelled" ? "Cancelled" : "Proposed")),
       m.place ? h("div", { class: "cal-place" }, m.place) : null);
+  }
+
+  // Public (no login) version: numbers only, never names.
+  function calMeetingPublic(m) {
+    const box = calBox(m);
+    if (m.status === "cancelled") return box;
+    const k = m.kids || { yes: 0, maybe: 0 };
+    box.append(calLine(k.yes > 0, "Kids", k.yes + " coming" + (k.maybe ? ", " + k.maybe + " maybe" : "")));
+    for (const [kind, v] of Object.entries(m.volunteers || {})) {
+      if (!v.slots) continue;
+      const open = v.slots - v.filled;
+      box.append(calLine(open <= 0, kind === "snacks" ? "Snacks" : "Parent present",
+        open <= 0 ? "covered ✓" : v.filled + "/" + v.slots + " · " + open + " open"));
+    }
+    return box;
+  }
+
+  function calMeeting(m, isCoach) {
+    const box = calBox(m);
     if (m.status === "cancelled") return box;
 
     if (isCoach) {
@@ -607,7 +636,11 @@
 
   function render() {
     root.replaceChildren();
-    if (!state.user) { root.append(viewLogin()); return; }
+    if (!state.user) {
+      if (state.pub) root.append(viewCalendar(true));
+      root.append(viewLogin());
+      return;
+    }
     if (state.user.role !== "coach" && (!state.parent || !myParents()[state.parent])) {
       root.append(state.data ? viewWhoAreYou() : h("p", { class: "fll-muted" }, "Loading…"));
       return;
@@ -641,6 +674,7 @@
       await startSession(me.user);
     } catch (err) {
       state.user = null;
+      await loadPublic();
       render();
     }
   })();
