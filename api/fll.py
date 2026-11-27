@@ -69,6 +69,25 @@ TEAM_TZ = "America/New_York"
 TEAM_PAGE_URL = "https://www.abhijitvshinde.com/fll-team.html"
 
 
+def presence_gaps(meeting, people):
+    """Parts of the meeting ([from, to] "HH:MM" pairs) with no parent present.
+    Without meeting times it is all-or-nothing: one gap ["", ""] when nobody signed up."""
+    start, end = meeting.get("start", ""), meeting.get("end", "")
+    if not (start and end and end > start):
+        return [] if people else [["", ""]]
+    spans = sorted((p.get("from") or start, p.get("to") or end) for p in people)
+    gaps, cur = [], start
+    for a, b in spans:
+        if a > cur:
+            gaps.append([cur, min(a, end)])
+        cur = max(cur, b)
+        if cur >= end:
+            break
+    if cur < end:
+        gaps.append([cur, end])
+    return [g for g in gaps if g[0] < g[1]]
+
+
 # ---------------------------------------------------------------- storage
 
 class StoreError(Exception):
@@ -886,8 +905,11 @@ class handler(BaseHTTPRequestHandler):
             }
             if item["status"] == "scheduled":
                 slots = m.get("slots") or {}
-                item["volunteers"] = {k: {"filled": len(vol.get(k) or []), "slots": int(slots.get(k, 1))}
-                                      for k in sorted(VOLUNTEER_KINDS)}
+                present = vol.get("present") or []
+                item["volunteers"] = {
+                    "snacks": {"filled": len(vol.get("snacks") or []), "slots": int(slots.get("snacks", 1))},
+                    "present": {"count": len(present), "gaps": presence_gaps(m, present)},
+                }
             out.append(item)
         self._send(200, {"meetings": out})
 
@@ -947,10 +969,24 @@ class handler(BaseHTTPRequestHandler):
         if self.body.get("join"):
             if meeting.get("status") != "scheduled":
                 raise ApiError(400, "Sign-up opens once the coach confirms this meeting.")
-            slots = int(meeting.get("slots", {}).get(kind, 1))
-            if len(people) >= slots:
-                raise ApiError(409, "Sorry, that spot was just taken.")
-            people.append({"u": sess["u"], "kid": user["name"], "by": by, "name": name, "at": int(time.time())})
+            entry = {"u": sess["u"], "kid": user["name"], "by": by, "name": name, "at": int(time.time())}
+            if kind == "present":
+                # No spot limit: each parent says which part of the meeting they can be there for.
+                start, end = meeting.get("start", ""), meeting.get("end", "")
+                t_from = self._time(self.body.get("from")) or start
+                t_to = self._time(self.body.get("to")) or end
+                if t_from and t_to:
+                    if t_to <= t_from:
+                        raise ApiError(400, "The end time must be after the start time.")
+                    if start and end and (t_from < start or t_to > end):
+                        raise ApiError(400, "Pick a time inside the meeting time.")
+                entry["from"], entry["to"] = t_from, t_to
+            else:
+                slots = int(meeting.get("slots", {}).get(kind, 1))
+                if len(people) >= slots:
+                    raise ApiError(409, "Sorry, that spot was just taken.")
+            people.append(entry)
+            people.sort(key=lambda p: p.get("from", ""))
         vol[kind] = people
         self._set_json(key, vol)
         self._send(200, {"ok": True, "volunteers": vol})

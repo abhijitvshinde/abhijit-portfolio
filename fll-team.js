@@ -2,7 +2,7 @@
    TEAM CORNER (fll-team.html) — Mechanical Masters FLL
    Parents log in with their child's FLL login, say if they are the
    mother or father, then mark meeting availability, time away and
-   volunteer for snacks / presenting. The coach plans meetings, sees
+   volunteer for snacks / being present (with a time range). The coach plans meetings, sees
    everyone's availability and tracks mentors (who have no logins).
    Data lives in /api/fll (team* actions).
 ========================================== */
@@ -12,8 +12,24 @@
 
   const KINDS = {
     snacks: { label: "Bring snacks", icon: "fa-cookie-bite" },
-    present: { label: "Present to the kids", icon: "fa-person-chalkboard" }
+    present: { label: "Parent present at the meeting", icon: "fa-user-shield" }
   };
+  // Parts of a meeting with no parent present: [[from, to], ...] ("HH:MM"). Mirrors presence_gaps() in api/fll.py.
+  function presenceGaps(m, people) {
+    const start = m.start || "", end = m.end || "";
+    if (!(start && end && end > start)) return people.length ? [] : [["", ""]];
+    const spans = people.map((p) => [p.from || start, p.to || end]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    const gaps = [];
+    let cur = start;
+    for (const [a, b] of spans) {
+      if (a > cur) gaps.push([cur, a < end ? a : end]);
+      if (b > cur) cur = b;
+      if (cur >= end) break;
+    }
+    if (cur < end) gaps.push([cur, end]);
+    return gaps.filter((g) => g[0] < g[1]);
+  }
+  const gapText = (gaps) => gaps.map((g) => g[0] ? niceTime(g[0]) + "–" + niceTime(g[1]) : "whole meeting").join(", ");
   // Meetings and other team activities share one list; `type` says which.
   const TYPES = {
     meeting: { label: "Team meeting", icon: "fa-people-group" },
@@ -186,7 +202,7 @@
         h("div", { class: "fll-login-icon" }, icon("fa-people-group")),
         h("h3", {}, "Parents & team"),
         h("p", { class: "fll-muted" }, "Log in with your child's FLL login (the one they use for the Attachment Lab). " +
-          "Here you can tell us when your child can come to meetings, add vacation dates, and sign up to bring snacks or present."),
+          "Here you can tell us when your child can come to meetings, add vacation dates, and sign up to bring snacks or to be there during a meeting."),
         form
       )
     );
@@ -354,7 +370,40 @@
       awayList(mine.away, (a) => act("team_away", { op: "remove", id: a.id }, (r) => { mine.away = r.away; })));
   }
 
+  // "Parent present": no spot limit; each parent picks the part of the meeting they can be there.
+  function presenceSlot(m, canSignUp) {
+    const vol = (state.data.volunteers[m.id] || {}).present || [];
+    const myBy = state.parent === "mother" ? "Mother" : "Father";
+    const me = canSignUp && vol.find((p) => p.u === state.user.username && p.by === myBy);
+    const gaps = presenceGaps(m, vol);
+    const save = (r) => { state.data.volunteers[m.id] = r.volunteers; };
+    const box = h("div", { class: "vol-slot" },
+      h("h5", {}, icon(KINDS.present.icon), " ", KINDS.present.label));
+    for (const p of vol) {
+      box.append(h("div", { class: "vol-person" }, icon("fa-check"), " ", volName(p),
+        p.from && m.start ? h("span", { class: "fll-muted small" }, " · " + niceTime(p.from) + "–" + niceTime(p.to)) : null));
+    }
+    box.append(gaps.length
+      ? h("div", { class: "vol-open" }, "Still needed: " + gapText(gaps))
+      : h("div", { class: "vol-person" }, icon("fa-circle-check"), " Whole meeting covered — thank you!"));
+    if (canSignUp) {
+      const from = h("input", { type: "time", value: (me && me.from) || m.start || "", min: m.start || null, max: m.end || null, "aria-label": "From" });
+      const to = h("input", { type: "time", value: (me && me.to) || m.end || "", min: m.start || null, max: m.end || null, "aria-label": "To" });
+      const join = () => act("team_volunteer", { meetingId: m.id, kind: "present", join: true, parent: state.parent, from: from.value, to: to.value }, save);
+      box.append(h("div", { class: "team-form" },
+        m.start ? h("label", {}, "From", from) : null,
+        m.end ? h("label", {}, "To", to) : null,
+        h("button", { class: "btn primary fll-small-btn", type: "button", onclick: join },
+          icon(me ? "fa-floppy-disk" : "fa-hand"), me ? " Update my time" : " I'll be there"),
+        me ? h("button", { class: "fll-tool-btn", type: "button",
+          onclick: () => act("team_volunteer", { meetingId: m.id, kind: "present", join: false, parent: state.parent }, save) },
+          icon("fa-xmark"), " Cancel") : null));
+    }
+    return box;
+  }
+
   function volunteerSlot(m, kind, canSignUp) {
+    if (kind === "present") return presenceSlot(m, canSignUp);
     const vol = (state.data.volunteers[m.id] || {})[kind] || [];
     const slots = (m.slots || {})[kind] ?? 1;
     const me = canSignUp && vol.find((p) => p.u === state.user.username && p.by === (state.parent === "mother" ? "Mother" : "Father"));
@@ -381,12 +430,12 @@
     const card = h("div", { class: "fll-card" },
       h("h3", {}, icon("fa-handshake-angle"), " Parent volunteers"),
       h("p", { class: "fll-muted" }, canSignUp
-        ? "Sign up to bring snacks for the kids or to present something to the team (a skill, your job, a science topic). Thank you!"
-        : "Who is bringing snacks and presenting at each confirmed meeting."),
+        ? "Sign up to bring snacks, or to be there as a parent during the meeting — pick the time you can stay. Thank you!"
+        : "Who is bringing snacks and which parents will be there at each confirmed meeting."),
       pastToggle());
     if (!list.length) card.append(h("p", { class: "fll-muted" }, "Sign-up opens when the coach confirms meeting dates."));
     for (const m of list) {
-      const kinds = Object.keys(KINDS).filter((k) => ((m.slots || {})[k] ?? 1) > 0);
+      const kinds = Object.keys(KINDS).filter((k) => k === "present" || ((m.slots || {})[k] ?? 1) > 0);
       card.append(h("div", { class: "team-meeting" }, meetingTitle(m), kinds.map((k) => volunteerSlot(m, k, canSignUp))));
     }
     return card;
@@ -448,7 +497,7 @@
       }
       card.append(h("div", { class: "team-meeting" },
         meetingTitle(m),
-        h("div", { class: "team-form" }, status, slotInput("snacks"), slotInput("present"),
+        h("div", { class: "team-form" }, status, slotInput("snacks"),
           h("button", { class: "fll-tool-btn", type: "button", onclick: () => { state.editing = m.id; state.msg = ""; render(); } },
             icon("fa-pen"), " Edit"),
           h("button", { class: "fll-tool-btn", type: "button", onclick: () => {
@@ -659,6 +708,12 @@
     const k = m.kids || { yes: 0, maybe: 0 };
     box.append(calLine(k.yes > 0, "Kids", k.yes + " coming" + (k.maybe ? ", " + k.maybe + " maybe" : "")));
     for (const [kind, v] of Object.entries(m.volunteers || {})) {
+      if (kind === "present") {
+        const gaps = v.gaps || [];
+        box.append(calLine(!gaps.length, "Parent present",
+          gaps.length ? (v.count ? v.count + " signed up · " : "") + "needed " + gapText(gaps) : "covered ✓"));
+        continue;
+      }
       if (!v.slots) continue;
       const open = v.slots - v.filled;
       box.append(calLine(open <= 0, kind === "snacks" ? "Snacks" : "Parent present",
@@ -684,6 +739,14 @@
     if (m.status === "scheduled") {
       const vol = state.data.volunteers[m.id] || {};
       for (const kind of Object.keys(KINDS)) {
+        if (kind === "present") {
+          const people = vol.present || [];
+          const gaps = presenceGaps(m, people);
+          const names = people.map((p) => volName(p) + (p.from && m.start ? " " + niceTime(p.from) + "–" + niceTime(p.to) : ""));
+          box.append(calLine(!gaps.length, "Parent present",
+            names.join(", ") + (gaps.length ? (names.length ? " · " : "") + "needed " + gapText(gaps) : "")));
+          continue;
+        }
         const slots = (m.slots || {})[kind] ?? 1;
         if (!slots) continue;
         const people = (vol[kind] || []).map(volName);
