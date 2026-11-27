@@ -462,7 +462,7 @@
         h("span", {}, h("span", { class: "cell no" }, "✗"), "No"),
         h("span", {}, h("span", { class: "cell away" }, "✈"), "Away (from vacation dates)"),
         h("span", {}, h("span", { class: "cell none" }, "–"), "No answer")),
-      h("p", { class: "fll-muted small" }, "Mentors have no login: click a mentor's square to set their answer."),
+      h("p", { class: "fll-muted small" }, "Click any square to change the answer (Yes → Maybe → No → blank). Use this when a parent tells you directly; it shows as \"set by Coach\" and the parent can still change it."),
       pastToggle());
     if (!meetings.length) { card.append(h("p", { class: "fll-muted" }, "Add meeting dates on the Plan tab first.")); return card; }
 
@@ -470,14 +470,18 @@
       icon(typeOf(m).icon), " ", shortDate(m.date), h("br"), h("span", { class: "badge " + m.status }, m.status === "scheduled" ? "Confirmed" : "Proposed"))));
     const body = h("tbody", {});
     body.append(h("tr", { class: "sub" }, h("td", { colspan: meetings.length + 1 }, "Kids (" + kids.length + ")")));
+    const cycle = { "": "yes", yes: "maybe", maybe: "no", no: "" };
     for (const k of kids) {
       body.append(h("tr", {}, h("td", {}, k.name), meetings.map((m) => {
         const c = cellFor(k.avail, k.away, m, k.parents);
-        return h("td", {}, h("span", { class: "cell " + c.cls, title: c.title }, c.mark));
+        const cur = (k.avail[m.id] || {}).s || "";
+        return h("td", {}, h("button", { type: "button", class: "cell " + c.cls, title: c.title + " — click to change",
+          "aria-label": k.name + ", " + shortDate(m.date) + ": " + c.title,
+          onclick: () => act("team_avail", { username: k.username, meetingId: m.id, status: cycle[cur] },
+            (r) => { k.avail = r.avail; }) }, c.mark));
       })));
     }
     body.append(h("tr", { class: "sub" }, h("td", { colspan: meetings.length + 1 }, "Mentors (" + mentors.length + ")")));
-    const cycle = { "": "yes", yes: "maybe", maybe: "no", no: "" };
     for (const mt of mentors) {
       body.append(h("tr", {}, h("td", {}, mt.name), meetings.map((m) => {
         const c = cellFor(mt.avail, mt.away, m);
@@ -519,14 +523,28 @@
   }
 
   function viewCoachAway() {
-    const card = h("div", { class: "fll-card" }, h("h3", {}, icon("fa-plane"), " Families' time away"));
-    const withAway = state.data.kids.filter((k) => k.away.length);
-    if (!withAway.length) card.append(h("p", { class: "fll-muted" }, "No family has added time away yet."));
+    const kids = state.data.kids;
+    const setAway = (k) => (r) => { k.away = r.away; };
+    const pick = h("select", { "aria-label": "Kid" },
+      h("option", { value: "" }, "Choose a kid…"), kids.map((k) => h("option", { value: k.username }, k.name)));
+    const card = h("div", { class: "fll-card" },
+      h("h3", {}, icon("fa-plane"), " Families' time away"),
+      h("p", { class: "fll-muted" }, "When a parent tells you their child will miss meetings, add the dates here. It shows as \"added by Coach\" and the parent sees it too."),
+      h("div", { class: "team-form" }, h("label", {}, "Kid", pick)),
+      awayForm((v) => {
+        const k = kids.find((x) => x.username === pick.value);
+        if (!k) { flash("Choose the kid first."); return; }
+        act("team_away", { op: "add", username: k.username, ...v }, setAway(k));
+      }));
+    const withAway = kids.filter((k) => k.away.length);
+    if (!withAway.length) card.append(h("p", { class: "fll-muted" }, "No time away added yet."));
     for (const k of withAway) {
       card.append(h("div", { class: "fll-sub" }, k.name));
       card.append(h("ul", { class: "fll-list" }, k.away.map((a) => h("li", {},
         h("strong", {}, shortDate(a.from), a.to !== a.from ? " – " + shortDate(a.to) : ""),
-        a.note ? " · " + a.note : "", " ", h("span", { class: "fll-muted small" }, "(by " + who(a, k.parents) + ")")))));
+        a.note ? " · " + a.note : "", " ", h("span", { class: "fll-muted small" }, "(by " + who(a, k.parents) + ") "),
+        h("button", { class: "fll-link-btn", type: "button",
+          onclick: () => act("team_away", { op: "remove", username: k.username, id: a.id }, setAway(k)) }, "remove")))));
     }
     return card;
   }

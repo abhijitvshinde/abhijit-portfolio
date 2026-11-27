@@ -8,6 +8,7 @@ One endpoint, routed by ?action=...
   Coach  : users, create_user, reset_password, delete_user, user_progress, sketch?username=
   Team page (/fll-team.html, kid logins used by parents):
            team (GET), team_avail, team_away, team_volunteer, team_parent (POST, kid)
+           team_avail, team_away also work for the coach with {username} (answer stamped "Coach")
            team_meeting, team_mentor (POST, coach)
            team_public (GET, no login: calendar with counts only, no names)
 
@@ -808,38 +809,46 @@ class handler(BaseHTTPRequestHandler):
             out.append(item)
         self._send(200, {"meetings": out})
 
+    def _team_target(self):
+        """Whose answers to change, and who is signing: a parent (kid login) for their own
+        child, or the coach for any kid ({username} in the body; stamped "Coach")."""
+        sess, user = self._require("any")
+        if user is not None:
+            return (sess["u"],) + self._signer(sess["u"])
+        return self._target_user()["username"], "Coach", ""
+
     def team_avail(self):
-        """Kid login (used by a parent): {meetingId, status: yes|maybe|no|'', parent}."""
-        sess, _ = self._require("kid")
-        by, name = self._signer(sess["u"])
+        """Kid login (used by a parent): {meetingId, status: yes|maybe|no|'', parent}.
+        Coach: same plus {username}."""
+        u, by, name = self._team_target()
         meeting = self._meeting(self.body.get("meetingId"))
         status = self.body.get("status") or ""
         if status and status not in AVAIL:
             raise ApiError(400, "Bad answer.")
-        avail = self._get_json("team:avail:" + sess["u"]) or {}
+        avail = self._get_json("team:avail:" + u) or {}
         if status:
             avail[meeting["id"]] = {"s": status, "by": by, "name": name, "at": int(time.time())}
         else:
             avail.pop(meeting["id"], None)
-        self._set_json("team:avail:" + sess["u"], avail)
+        self._set_json("team:avail:" + u, avail)
         self._send(200, {"ok": True, "avail": avail})
 
     def team_away(self):
-        """Kid login: {op: add, from, to, note, parent} or {op: remove, id}."""
-        sess, _ = self._require("kid")
-        away = self._get_json("team:away:" + sess["u"]) or []
+        """Kid login: {op: add, from, to, note, parent} or {op: remove, id}. Coach: same plus {username}."""
+        u, by, name = self._team_target()
+        away = self._get_json("team:away:" + u) or []
         op = self.body.get("op")
         if op == "add":
             if len(away) >= MAX_AWAY:
                 raise ApiError(400, "That is a lot of trips! Remove an old one first.")
-            away.append(self._away_entry(*self._signer(sess["u"])))
+            away.append(self._away_entry(by, name))
             away.sort(key=lambda a: a["from"])
         elif op == "remove":
             away_id = self._id(self.body.get("id"), "trip")
             away = [a for a in away if a["id"] != away_id]
         else:
             raise ApiError(400, "Bad request.")
-        self._set_json("team:away:" + sess["u"], away)
+        self._set_json("team:away:" + u, away)
         self._send(200, {"ok": True, "away": away})
 
     def team_volunteer(self):
