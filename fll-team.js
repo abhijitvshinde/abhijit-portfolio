@@ -150,7 +150,7 @@
 
   /* ---------- login ---------- */
 
-  function viewLogin() {
+  function viewLogin(compact) {
     const msg = h("p", { class: "fll-msg", role: "alert" }, state.msg || "");
     const user = h("input", { id: "tUser", type: "text", autocomplete: "username", autocapitalize: "none", spellcheck: "false", required: true });
     const pass = h("input", { id: "tPass", type: "password", autocomplete: "current-password", required: true });
@@ -175,6 +175,12 @@
       h("label", { for: "tPass" }, "Password"), pass,
       btn, msg
     );
+    if (compact) {
+      return h("div", { class: "fll-card team-login-mini" },
+        h("h3", {}, icon("fa-right-to-bracket"), " Parents & team login"),
+        h("p", { class: "fll-muted small" }, "Use your child's FLL login to answer meetings, add vacations and volunteer."),
+        form);
+    }
     return h("div", { class: "fll-login" },
       h("div", { class: "fll-card fll-login-card" },
         h("div", { class: "fll-login-icon" }, icon("fa-people-group")),
@@ -547,7 +553,7 @@
     const card = h("div", { class: "fll-card" },
       h("h3", {}, icon("fa-calendar-days"), pub ? " Team calendar" : " Calendar"),
       pub
-        ? h("p", { class: "fll-muted small" }, "Upcoming meetings and activities, how many kids are coming, and which volunteer spots are filled. Log in below to answer or sign up.")
+        ? h("p", { class: "fll-muted small" }, "Upcoming meetings and activities, how many kids are coming, and which volunteer spots are filled. Log in to answer or sign up.")
         : isCoach
         ? h("div", { class: "team-legend" },
           h("span", {}, h("span", { class: "dot ok" }), "Covered"),
@@ -637,8 +643,9 @@
   function render() {
     root.replaceChildren();
     if (!state.user) {
-      if (state.pub) root.append(viewCalendar(true));
-      root.append(viewLogin());
+      // Calendar on the left, a compact login card in the top-right corner (stacks on phones).
+      if (state.pub) root.append(h("div", { class: "team-public" }, viewLogin(true), viewCalendar(true)));
+      else root.append(viewLogin());
       return;
     }
     if (state.user.role !== "coach" && (!state.parent || !myParents()[state.parent])) {
