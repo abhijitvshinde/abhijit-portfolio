@@ -33,7 +33,7 @@
   ];
   const PARENT_KEY = "fllTeamParent:";
 
-  const state = { user: null, parent: null, data: null, pub: null, tab: null, showPast: false, msg: "", calMonth: null };
+  const state = { user: null, parent: null, data: null, pub: null, editing: null, tab: null, showPast: false, msg: "", calMonth: null };
 
   /* ---------- helpers ---------- */
 
@@ -394,29 +394,37 @@
 
   /* ---------- coach views ---------- */
 
+  // Add form (m = null) or edit form pre-filled from meeting m.
+  function eventForm(m, onSave, onCancel) {
+    const v = m || { type: "meeting", start: "16:00", end: "18:00" };
+    const type = h("select", {}, Object.entries(TYPES).map(([id, t]) => h("option", { value: id, selected: (v.type || "meeting") === id }, t.label)));
+    const title = h("input", { type: "text", maxlength: "60", placeholder: "e.g. NC Zoo trip (optional)", value: v.title || "" });
+    const date = h("input", { type: "date", required: true, value: v.date || "" });
+    const start = h("input", { type: "time", value: v.start || "" });
+    const end = h("input", { type: "time", value: v.end || "" });
+    const place = h("input", { type: "text", maxlength: "60", placeholder: "e.g. Coach's home", value: v.place || "" });
+    const note = h("input", { type: "text", maxlength: "120", placeholder: "e.g. Robot runs practice", value: v.note || "" });
+    return h("form", {
+      class: "team-form",
+      onsubmit: (e) => {
+        e.preventDefault();
+        if (start.value && end.value && end.value <= start.value) { flash("The end time must be after the start time."); return; }
+        onSave({ type: type.value, title: title.value, date: date.value, start: start.value, end: end.value, place: place.value, note: note.value });
+      }
+    },
+      h("label", {}, "What", type), h("label", {}, "Title", title),
+      h("label", {}, "Date", date), h("label", {}, "Start", start), h("label", {}, "End", end),
+      h("label", {}, "Place", place), h("label", {}, "Note", note),
+      h("button", { class: "btn primary fll-small-btn", type: "submit" }, icon(m ? "fa-floppy-disk" : "fa-plus"), m ? " Save changes" : " Add date"),
+      onCancel ? h("button", { class: "fll-tool-btn", type: "button", onclick: onCancel }, "Cancel") : null);
+  }
+
   function viewCoachPlan() {
-    const type = h("select", {}, Object.entries(TYPES).map(([id, t]) => h("option", { value: id }, t.label)));
-    const title = h("input", { type: "text", maxlength: "60", placeholder: "e.g. NC Zoo trip (optional)" });
-    const date = h("input", { type: "date", required: true });
-    const start = h("input", { type: "time", value: "16:00" });
-    const end = h("input", { type: "time", value: "18:00" });
-    const place = h("input", { type: "text", maxlength: "60", placeholder: "e.g. Coach's home" });
-    const note = h("input", { type: "text", maxlength: "120", placeholder: "e.g. Robot runs practice" });
+    const setMeetings = (r) => { state.data.meetings = r.meetings; };
     const card = h("div", { class: "fll-card" },
       h("h3", {}, icon("fa-calendar-plus"), " Plan meetings & activities"),
-      h("p", { class: "fll-muted" }, "Add team meetings or activities (zoo visit, fundraiser, visiting another team…). Add them as Proposed so families can answer, check the Availability tab, then switch the best ones to Confirmed. Parents can only volunteer for confirmed ones."),
-      h("form", {
-        class: "team-form",
-        onsubmit: (e) => {
-          e.preventDefault();
-          act("team_meeting", { op: "add", type: type.value, title: title.value, date: date.value, start: start.value, end: end.value, place: place.value, note: note.value },
-            (r) => { state.data.meetings = r.meetings; });
-        }
-      },
-        h("label", {}, "What", type), h("label", {}, "Title", title),
-        h("label", {}, "Date", date), h("label", {}, "Start", start), h("label", {}, "End", end),
-        h("label", {}, "Place", place), h("label", {}, "Note", note),
-        h("button", { class: "btn primary fll-small-btn", type: "submit" }, icon("fa-plus"), " Add date")),
+      h("p", { class: "fll-muted" }, "Add team meetings or activities (zoo visit, fundraiser, visiting another team…). Add them as Proposed so families can answer, check the Availability tab, then switch the best ones to Confirmed. Parents can only volunteer for confirmed ones. Use Edit to change the date, time, place or anything else — answers and sign-ups are kept."),
+      eventForm(null, (vals) => act("team_meeting", { op: "add", ...vals }, setMeetings)),
       pastToggle());
     const list = visibleMeetings(true);
     if (!list.length) card.append(h("p", { class: "fll-muted" }, "Nothing planned yet."));
@@ -429,9 +437,20 @@
         h("input", { type: "number", min: "0", max: "10", value: (m.slots || {})[kind] ?? 1,
           onchange: (e) => act("team_meeting", { op: "update", id: m.id, slots: { [kind]: e.target.value } },
             (r) => { state.data.meetings = r.meetings; }) }));
+      if (state.editing === m.id) {
+        card.append(h("div", { class: "team-meeting" },
+          h("div", { style: "flex:1 1 100%" },
+            h("div", { class: "fll-sub" }, icon("fa-pen"), " Editing: ", eventName(m), " · ", niceDate(m.date)),
+            eventForm(m,
+              (vals) => act("team_meeting", { op: "update", id: m.id, ...vals }, (r) => { state.data.meetings = r.meetings; state.editing = null; }),
+              () => { state.editing = null; render(); }))));
+        continue;
+      }
       card.append(h("div", { class: "team-meeting" },
         meetingTitle(m),
         h("div", { class: "team-form" }, status, slotInput("snacks"), slotInput("present"),
+          h("button", { class: "fll-tool-btn", type: "button", onclick: () => { state.editing = m.id; state.msg = ""; render(); } },
+            icon("fa-pen"), " Edit"),
           h("button", { class: "fll-tool-btn", type: "button", onclick: () => {
             if (confirm("Delete the meeting on " + niceDate(m.date) + "? Its answers and sign-ups are removed too.")) {
               act("team_meeting", { op: "remove", id: m.id }, (r) => { state.data.meetings = r.meetings; });
