@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/fll-team.ics", "destination": "/api/fll?action=team_ics" }
+  ],
   "redirects": [
     { "source": "/contact.html", "destination": "/#contact", "permanent": true },
     { "source": "/research.html", "destination": "/#research", "permanent": true }

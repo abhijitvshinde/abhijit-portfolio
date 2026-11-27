@@ -53,7 +53,7 @@
     }
     return el;
   }
-  const icon = (name) => h("i", { class: "fa-solid " + name, "aria-hidden": "true" });
+  const icon = (name) => h("i", { class: (name.startsWith("fa-brands") ? "" : "fa-solid ") + name, "aria-hidden": "true" });
 
   async function api(action, opts = {}) {
     const method = opts.method || "GET";
@@ -617,7 +617,27 @@
       grid.append(cell);
     }
     card.append(h("div", { class: "cal-wrap" }, grid));
+    card.append(calSubscribe());
     return card;
+  }
+
+  // Subscribe links: the feed (/fll-team.ics) updates by itself when the coach changes events.
+  function calSubscribe() {
+    const https = location.origin + "/fll-team.ics";
+    const webcal = https.replace(/^https?:/, "webcal:");
+    const note = h("span", { class: "fll-muted small" });
+    return h("div", { class: "cal-sub" },
+      h("strong", {}, icon("fa-calendar-plus"), " Add to your calendar:"),
+      h("a", { class: "btn primary fll-small-btn", href: "https://calendar.google.com/calendar/r?cid=" + encodeURIComponent(webcal),
+        target: "_blank", rel: "noopener" }, icon("fa-brands fa-google"), " Google Calendar"),
+      h("a", { class: "btn primary fll-small-btn", href: webcal }, icon("fa-brands fa-apple"), " Apple Calendar"),
+      h("button", { class: "fll-tool-btn", type: "button", onclick: async () => {
+        try { await navigator.clipboard.writeText(https); note.textContent = "Link copied — paste it into Outlook or any calendar app (\"subscribe from URL\")."; }
+        catch (e) { note.textContent = https; }
+      } }, icon("fa-link"), " Copy link"),
+      h("div", { class: "fll-muted small cal-sub-help" },
+        "It subscribes, so new or changed meetings show up automatically (Google can take a few hours to refresh). Only event names and times are shared — see this page for the place and sign-ups."),
+      note);
   }
 
   function calLine(ok, label, text) {

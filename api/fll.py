@@ -63,6 +63,10 @@ EVENT_TYPES = {"meeting", "zoo", "fundraiser", "team_visit", "outreach", "compet
 MAX_MEETINGS = 120
 MAX_AWAY = 40
 MAX_MENTORS = 20
+# Logins that are not real team members (left out of availability counts and grids).
+TEAM_EXCLUDE = {"demo"}
+TEAM_TZ = "America/New_York"
+TEAM_PAGE_URL = "https://www.abhijitvshinde.com/fll-team.html"
 
 
 # ---------------------------------------------------------------- storage
@@ -282,6 +286,18 @@ class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         self._dispatch("POST")
 
+    def _send_text(self, body, content_type, filename=None):
+        body = body.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Cache-Control", "public, max-age=900")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        if filename:
+            self.send_header("Content-Disposition", f'inline; filename="{filename}"')
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def _send(self, status, data, cookie=None):
         body = json.dumps(data).encode()
         self.send_response(status)
@@ -357,6 +373,7 @@ class handler(BaseHTTPRequestHandler):
                 ("POST", "robot_score"): self.save_robot_score,
                 ("GET", "team"): self.get_team,
                 ("GET", "team_public"): self.team_public,
+                ("GET", "team_ics"): self.team_ics,
                 ("POST", "team_avail"): self.team_avail,
                 ("POST", "team_away"): self.team_away,
                 ("POST", "team_volunteer"): self.team_volunteer,
@@ -762,7 +779,7 @@ class handler(BaseHTTPRequestHandler):
             }
             return self._send(200, out)
         # coach: everyone's availability and time away
-        names = sorted(self.store.cmd("SMEMBERS", PREFIX + "users") or [])
+        names = self._team_members()
         kids = []
         if names:
             keys = []
@@ -784,11 +801,76 @@ class handler(BaseHTTPRequestHandler):
         out["mentors"] = self._get_json("team:mentors") or []
         self._send(200, out)
 
+    def _team_members(self):
+        """Kid usernames on the team, without test logins such as "demo"."""
+        names = self.store.cmd("SMEMBERS", PREFIX + "users") or []
+        return sorted(n for n in names if n.lower() not in TEAM_EXCLUDE)
+
+    def team_ics(self):
+        """No login: iCalendar feed of team events for Google / Apple Calendar subscriptions.
+        Same privacy as team_public: event names and times only, no place, notes or names."""
+        def esc(text):
+            return (text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
+                    .replace("\r", "").replace("\n", "\\n"))
+
+        def fold(line):  # RFC 5545: lines over 75 octets continue with a leading space
+            out, raw = [], line.encode()
+            while len(raw) > 75:
+                cut = 75
+                while cut > 0 and (raw[cut] & 0xC0) == 0x80:  # don't split a UTF-8 character
+                    cut -= 1
+                out.append(raw[:cut].decode())
+                raw = b" " + raw[cut:]
+            out.append(raw.decode())
+            return "\r\n".join(out)
+
+        labels = {"meeting": "Team meeting", "zoo": "Zoo visit", "fundraiser": "Fundraiser",
+                  "team_visit": "Visit another team", "outreach": "Outreach / demo",
+                  "competition": "Competition", "other": "Team activity"}
+        stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        lines = [
+            "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Mechanical Masters FLL//Team Corner//EN",
+            "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+            "X-WR-CALNAME:Mechanical Masters FLL", "X-WR-TIMEZONE:" + TEAM_TZ,
+            "REFRESH-INTERVAL;VALUE=DURATION:PT6H", "X-PUBLISHED-TTL:PT6H",
+            # US Eastern time rules, so times show correctly in every calendar app
+            "BEGIN:VTIMEZONE", "TZID:" + TEAM_TZ,
+            "BEGIN:DAYLIGHT", "TZOFFSETFROM:-0500", "TZOFFSETTO:-0400", "TZNAME:EDT",
+            "DTSTART:19700308T020000", "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU", "END:DAYLIGHT",
+            "BEGIN:STANDARD", "TZOFFSETFROM:-0400", "TZOFFSETTO:-0500", "TZNAME:EST",
+            "DTSTART:19701101T020000", "RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU", "END:STANDARD",
+            "END:VTIMEZONE",
+        ]
+        for m in self._meetings():
+            status = m.get("status", "proposed")
+            day = m["date"].replace("-", "")
+            name = m.get("title") or labels.get(m.get("type"), "Team meeting")
+            if status == "proposed":
+                name += " (proposed)"
+            lines += ["BEGIN:VEVENT", "UID:" + m["id"] + "@mechanical-masters-fll", "DTSTAMP:" + stamp,
+                      "SUMMARY:" + esc("FLL: " + name)]
+            if m.get("start"):
+                end = m.get("end") if m.get("end") and m["end"] > m["start"] else None
+                if not end:  # no (valid) end time: assume one hour
+                    hh, mm = map(int, m["start"].split(":"))
+                    end = f"{min(hh + 1, 23):02d}:{mm:02d}"
+                lines += [f"DTSTART;TZID={TEAM_TZ}:{day}T{m['start'].replace(':', '')}00",
+                          f"DTEND;TZID={TEAM_TZ}:{day}T{end.replace(':', '')}00"]
+            else:
+                import datetime
+                nxt = (datetime.date.fromisoformat(m["date"]) + datetime.timedelta(days=1)).strftime("%Y%m%d")
+                lines += ["DTSTART;VALUE=DATE:" + day, "DTEND;VALUE=DATE:" + nxt]
+            lines += ["STATUS:" + {"scheduled": "CONFIRMED", "cancelled": "CANCELLED"}.get(status, "TENTATIVE"),
+                      "DESCRIPTION:" + esc("Place, details and sign-ups: " + TEAM_PAGE_URL),
+                      "URL:" + TEAM_PAGE_URL, "END:VEVENT"]
+        lines.append("END:VCALENDAR")
+        self._send_text("\r\n".join(fold(l) for l in lines) + "\r\n", "text/calendar; charset=utf-8", "mechanical-masters-fll.ics")
+
     def team_public(self):
         """No login needed: the calendar shown on the Team Corner login screen.
         Counts only — no kid, parent or volunteer names, and no place or notes."""
         meetings = self._meetings()
-        names = sorted(self.store.cmd("SMEMBERS", PREFIX + "users") or [])
+        names = self._team_members()
         keys = [PREFIX + "team:avail:" + n for n in names] + [PREFIX + "team:vol:" + m["id"] for m in meetings]
         raw = self.store.cmd("MGET", *keys) if keys else []
         avails = [json.loads(a) if a else {} for a in raw[:len(names)]]
