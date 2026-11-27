@@ -66,6 +66,16 @@ MAX_MEETINGS = 120
 MAX_AWAY = 40
 MAX_MENTORS = 20
 MAX_HOURS = 300
+# Project board (fll-projects.html)
+PM_AREAS = {  # same four areas as the team's "Road to States" plan
+    "robot": "Robot", "project": "Innovation Project", "team": "Team & Core Values", "logistics": "Logistics",
+}
+PM_STATUS = {"not_started", "in_progress", "blocked", "done", "abandoned"}
+PM_CODE_RE = re.compile(r"^T\d{2,3}$")
+MAX_PM_NOTES = 30
+PM_PRIORITY = {"low", "normal", "high"}
+MAX_PM_TASKS = 400
+MAX_PM_POSTS = 80
 # Logins that are not real team members (left out of availability counts and grids).
 TEAM_EXCLUDE = {"demo"}
 TEAM_TZ = "America/New_York"
@@ -407,6 +417,9 @@ class handler(BaseHTTPRequestHandler):
                 ("GET", "hours"): self.get_hours,
                 ("POST", "hours"): self.save_hours,
                 ("POST", "hours_decide"): self.hours_decide,
+                ("GET", "pm"): self.get_pm,
+                ("POST", "pm_task"): self.pm_task,
+                ("POST", "pm_post"): self.pm_post,
             }
             fn = routes.get((method, action))
             if not fn:
@@ -1297,3 +1310,180 @@ class handler(BaseHTTPRequestHandler):
         entry["decidedAt"] = int(time.time()) if status != "pending" else None
         self._set_json(key, hours)
         self._send(200, {"ok": True, "hours": hours})
+
+    # --- project board (fll-projects.html): posts (team roles) and tasks with a timeline
+    #
+    # Posts give a kid a title and rights: area "all" (Captain / Vice Captain) may edit tasks
+    # everywhere; "assign": True also lets them hand out area posts. Only the coach can create
+    # posts with "assign". Everyone logged in (kids, mentors, coach) can see the board;
+    # a task's assignees can always change its status.
+
+    def _pm_actor(self):
+        """(role, username, display name). Mentors may look but not change anything."""
+        if self._role() == "mentor":
+            sess, mentor = self._require("mentor")
+            return "mentor", sess["u"], mentor["name"]
+        sess, user = self._require("any")
+        if user is None:
+            return "coach", sess["u"], "Coach"
+        return "kid", sess["u"], user["name"]
+
+    def _pm_rights(self, role, username, posts):
+        if role == "coach":
+            return {"areas": sorted(PM_AREAS), "all": True, "assign": True, "coach": True}
+        if role != "kid":
+            return {"areas": [], "all": False, "assign": False, "coach": False}
+        mine = [p for p in posts if p["username"] == username]
+        every = any(p["area"] == "all" for p in mine)
+        areas = sorted(PM_AREAS) if every else sorted({p["area"] for p in mine if p["area"] in PM_AREAS})
+        return {"areas": areas, "all": every, "assign": any(p.get("assign") for p in mine), "coach": False}
+
+    def get_pm(self):
+        role, username, name = self._pm_actor()
+        posts = self._get_json("pm:posts") or []
+        names = self._team_members()
+        raw = self.store.cmd("MGET", *[PREFIX + "user:" + n for n in names]) if names else []
+        kids = [{"username": n, "name": json.loads(r)["name"]} for n, r in zip(names, raw) if r]
+        known = {k["username"] for k in kids}
+        self._send(200, {
+            "areas": PM_AREAS,
+            "posts": [p for p in posts if p["username"] in known],
+            "tasks": self._get_json("pm:tasks") or [],
+            "kids": kids,
+            "me": {"role": role, "username": username, "name": name,
+                   "rights": self._pm_rights(role, username, posts)},
+        })
+
+    def pm_task(self):
+        """{op: add, area, title, desc, assignees, start, end, status, priority}
+        | {op: update, id, ...same fields} | {op: status, id, status} | {op: remove, id}."""
+        role, username, name = self._pm_actor()
+        posts = self._get_json("pm:posts") or []
+        rights = self._pm_rights(role, username, posts)
+        tasks = self._get_json("pm:tasks") or []
+        op = self.body.get("op")
+
+        def need_area(area):
+            if area not in rights["areas"]:
+                raise ApiError(403, "Only the coach, captains or the " + PM_AREAS.get(area, "area") +
+                               " lead can change these tasks.")
+
+        if op == "add":
+            if len(tasks) >= MAX_PM_TASKS:
+                raise ApiError(400, "Too many tasks. Remove old ones first.")
+            used = {t.get("code") for t in tasks}
+            code = self.body.get("code")
+            if not (isinstance(code, str) and PM_CODE_RE.match(code) and code not in used):
+                n = max([int(c[1:]) for c in used if c and PM_CODE_RE.match(c)] + [0]) + 1
+                code = f"T{n:02d}"
+            task = {"id": secrets.token_hex(4), "code": code, "createdBy": name, "created": int(time.time()),
+                    "status": "not_started", "notes": []}
+            tasks.append(task)
+        else:
+            task_id = self._id(self.body.get("id"), "task")
+            task = next((t for t in tasks if t["id"] == task_id), None)
+            if not task:
+                raise ApiError(404, "That task no longer exists.")
+
+        if op == "remove":
+            need_area(task["area"])
+            tasks.remove(task)
+        elif op == "note":
+            # Follow-up notes: anyone on the team can add one; you (or the leads) can delete yours.
+            notes = task.setdefault("notes", [])
+            if self.body.get("remove"):
+                note_id = self._id(self.body.get("noteId"), "note")
+                note = next((n for n in notes if n["id"] == note_id), None)
+                if note and note.get("u") != username and task["area"] not in rights["areas"]:
+                    raise ApiError(403, "You can only delete your own notes.")
+                task["notes"] = [n for n in notes if n["id"] != note_id]
+            else:
+                text = clean_text(self.body.get("text"), 300)
+                if not text:
+                    raise ApiError(400, "Type the note first.")
+                if len(notes) >= MAX_PM_NOTES:
+                    notes.pop(0)
+                notes.append({"id": secrets.token_hex(4), "u": username, "by": name, "text": text, "at": int(time.time())})
+        elif op == "status":
+            # Assignees can always move their own task along.
+            if username not in task.get("assignees", []) and task["area"] not in rights["areas"]:
+                raise ApiError(403, "Only the people on this task (or the leads) can change its status.")
+            status = self.body.get("status")
+            if status not in PM_STATUS:
+                raise ApiError(400, "Bad status.")
+            task["status"] = status
+        elif op in ("add", "update"):
+            if op == "update":
+                need_area(task["area"])
+            area = self.body.get("area")
+            if area not in PM_AREAS:
+                raise ApiError(400, "Pick an area.")
+            need_area(area)
+            title = clean_text(self.body.get("title"), 80)
+            if not title:
+                raise ApiError(400, "Give the task a name.")
+            start = self._date(self.body.get("start"), "start date")
+            end = self._date(self.body.get("end"), "end date")
+            if end < start:
+                raise ApiError(400, "The end date is before the start date.")
+            members = set(self._team_members())
+            assignees = self.body.get("assignees") or []
+            if not isinstance(assignees, list) or any(a not in members for a in assignees):
+                raise ApiError(400, "Unknown team member.")
+            status = self.body.get("status") or task.get("status", "not_started")
+            if status not in PM_STATUS:
+                raise ApiError(400, "Bad status.")
+            priority = self.body.get("priority") or "normal"
+            if priority not in PM_PRIORITY:
+                raise ApiError(400, "Bad priority.")
+            task.update({"area": area, "title": title, "desc": clean_text(self.body.get("desc"), 400),
+                         "assignees": sorted(set(assignees)), "start": start, "end": end,
+                         "status": status, "priority": priority, "key": bool(self.body.get("key"))})
+        else:
+            raise ApiError(400, "Bad request.")
+        if op != "remove":
+            task["updated"] = int(time.time())
+            task["updatedBy"] = name
+        tasks.sort(key=lambda t: (t["end"], t["start"], t.get("code", "")))
+        self._set_json("pm:tasks", tasks)
+        self._send(200, {"ok": True, "tasks": tasks})
+
+    def pm_post(self):
+        """Hand out team posts. {op: add, username, title, area (area key or "all"), assign}
+        | {op: remove, id}. Coach: anything. Kids with an "assign" post (captain / vice captain):
+        area posts only (not "all", not "assign")."""
+        role, username, name = self._pm_actor()
+        posts = self._get_json("pm:posts") or []
+        rights = self._pm_rights(role, username, posts)
+        if not rights["assign"]:
+            raise ApiError(403, "Only the coach, captain or vice captain can hand out posts.")
+        op = self.body.get("op")
+        if op == "add":
+            if len(posts) >= MAX_PM_POSTS:
+                raise ApiError(400, "Too many posts.")
+            who = clean_text(self.body.get("username"), 40).lower()
+            if who not in self._team_members():
+                raise ApiError(400, "Pick a team member.")
+            area = self.body.get("area")
+            if area != "all" and area not in PM_AREAS:
+                raise ApiError(400, "Pick an area.")
+            assign = bool(self.body.get("assign"))
+            if not rights["coach"] and (area == "all" or assign):
+                raise ApiError(403, "Only the coach can make captains.")
+            title = clean_text(self.body.get("title"), 40)
+            if not title:
+                raise ApiError(400, "Type the title, e.g. Innovation Lead.")
+            posts.append({"id": secrets.token_hex(4), "username": who, "title": title, "area": area,
+                          "assign": assign, "by": name, "at": int(time.time())})
+        elif op == "remove":
+            post_id = self._id(self.body.get("id"), "post")
+            post = next((p for p in posts if p["id"] == post_id), None)
+            if not post:
+                raise ApiError(404, "That post no longer exists.")
+            if not rights["coach"] and (post["area"] == "all" or post.get("assign")):
+                raise ApiError(403, "Only the coach can change captains.")
+            posts.remove(post)
+        else:
+            raise ApiError(400, "Bad request.")
+        self._set_json("pm:posts", posts)
+        self._send(200, {"ok": True, "posts": posts})

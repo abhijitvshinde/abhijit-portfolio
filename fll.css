@@ -171,7 +171,10 @@ button.fll-btn-good{ border:0; }
 .coach-page select,
 .team-page input[type="text"],
 .team-page input[type="password"],
-.team-page select{
+.team-page select,
+.pm-page input[type="text"],
+.pm-page input[type="password"],
+.pm-page select{
   width:100%;
   padding:13px 15px;
   border-radius:14px;
@@ -189,7 +192,10 @@ button.fll-btn-good{ border:0; }
 .coach-page input:focus,
 .coach-page select:focus,
 .team-page input:focus,
-.team-page select:focus{
+.team-page select:focus,
+.pm-page input:focus,
+.pm-page select:focus,
+.pm-page textarea:focus{
   outline:none;
   border-color:var(--fll-green);
   box-shadow:0 0 0 3px rgba(163,230,53,0.18);
