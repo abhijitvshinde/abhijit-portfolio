@@ -158,7 +158,7 @@
     const left = daysBetween(today(), EVENT.date);
     return h("div", { class: "fll-header" },
       h("span", { class: "fll-who" }, icon(roleIcon), " ", me.name, " ",
-        me.role === "coach" ? h("small", {}, "· Coach") : me.role === "mentor" ? h("small", {}, "· Mentor") : null, " ", titles),
+        me.role === "coach" ? null : me.role === "mentor" ? h("small", {}, "· Mentor") : null, " ", titles),
       left >= 0 ? h("span", { class: "pm-countdown", title: EVENT.label + " · " + parse(EVENT.date).toDateString() },
         h("strong", {}, String(left)), " day" + (left === 1 ? "" : "s") + " to " + EVENT.label) : null,
       h("button", { class: "fll-tool-btn", type: "button", onclick: logout }, icon("fa-right-from-bracket"), " Log out"));
